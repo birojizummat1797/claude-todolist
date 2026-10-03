@@ -3,7 +3,7 @@
 /* ---------- constants ---------- */
 // Category and priority values are stored in Uzbek Cyrillic and translated only for display.
 const KEY = 'todolist.v1';
-const VERSION = '9';
+const VERSION = '10';
 const CATS = ['Шахсий', 'Иш', 'Ўқиш', 'Соғлиқ', 'Молия', 'Бошқа'];
 const PRIO = { 1: 'Паст', 2: 'Ўрта', 3: 'Юқори' };
 
@@ -275,7 +275,7 @@ function runSplash(forceId, preview = false) {
       <p class="sp-sub">${esc(g.sub)}</p>
       <div class="sp-bar"><i></i></div>
       <p class="sp-skip">${esc(g.skip)}</p>
-      <p class="sp-brand">✔ ${esc(tr('Режаларим'))}</p>
+      <p class="sp-brand">✔ ${esc(tr('Тартибот'))}</p>
     </div>`;
   document.body.appendChild(el);
   document.body.classList.add('splashing');
@@ -300,7 +300,7 @@ function runSplash(forceId, preview = false) {
 function applyLang() {
   LANG = LANGS[S.lang] ? S.lang : 'uz-Cyrl';
   document.documentElement.lang = LANG;
-  document.title = tr('Режаларим');
+  document.title = tr('Тартибот');
   document.querySelector('meta[name=description]').content = tr('Календарь, ҳисобот ва йўл харитаси билан вазифалар рўйхати');
   document.getElementById('lang').value = LANG;
   applyStatic();
@@ -1072,7 +1072,7 @@ document.addEventListener('click', e => {
     case 'export': {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
-      a.download = `rejalarim-${today()}.json`;
+      a.download = `tartibot-${today()}.json`;
       a.click(); URL.revokeObjectURL(a.href);
       return;
     }

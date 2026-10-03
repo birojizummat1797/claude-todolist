@@ -27,7 +27,7 @@ Object.assign(DICT.en, {
   'Якуний текшириш ва хулоса': 'Final review and conclusions',
   'Мисол:': 'Example:', 'Грамматика асослари': 'Grammar basics', 'Луғат: 500 та сўз': 'Vocabulary: 500 words',
   // static UI
-  'Режаларим': 'My Plans', 'Фон': 'Theme', 'Бўлимлар': 'Sections', 'Вазифалар': 'Tasks', 'Одатлар': 'Habits',
+  'Тартибот': 'Tartibot', 'Фон': 'Theme', 'Бўлимлар': 'Sections', 'Вазифалар': 'Tasks', 'Одатлар': 'Habits',
   'Календарь': 'Calendar', 'Режа': 'Plan', 'Ҳисобот': 'Report',
   'Маълумот фақат шу қурилмада сақланади.': 'Data is stored only on this device.',
   'Нусха олиш': 'Export backup', 'Тиклаш': 'Restore', 'Версия': 'Version',

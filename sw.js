@@ -1,6 +1,6 @@
 'use strict';
 // Bump CACHE when any cached file changes so installed copies refresh.
-const CACHE = 'rejalarim-v9';
+const CACHE = 'tartibot-v10';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'i18n.js', 'i18n-ru.js', 'i18n-en.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
