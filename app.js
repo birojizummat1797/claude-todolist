@@ -64,13 +64,13 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 /* ---------- state ---------- */
 const defaultState = () => ({ tasks: [], goals: [], capacity: 6, theme: 'auto' });
 const THEMES = [
-  { id: 'auto', name: 'Оддий', mode: '', p: ['#dbe6ff', '#eddfff', '#d9f3e6'] },
-  { id: 'aurora', name: 'Аврора', mode: 'dark', p: ['#19b88f', '#5a57ee', '#b24fd6'] },
-  { id: 'night', name: 'Тун', mode: 'dark', p: ['#1c2a6b', '#3a1d6e', '#0c4a5c'] },
-  { id: 'ocean', name: 'Океан', mode: 'light', p: ['#5db2f0', '#8fe8d8', '#a9c6ff'] },
-  { id: 'sunset', name: 'Шафақ', mode: 'light', p: ['#ff9a6a', '#ff7fae', '#c78cff'] },
-  { id: 'forest', name: 'Ўрмон', mode: 'light', p: ['#7fd49a', '#5fc4a8', '#dcee8f'] },
-  { id: 'lavender', name: 'Лаванда', mode: 'light', p: ['#c4a8ff', '#ffb8e0', '#b0c8ff'] }
+  { id: 'auto', c: '#2f6fed', name: 'Оддий', mode: '', p: ['#dbe6ff', '#eddfff', '#d9f3e6'] },
+  { id: 'aurora', c: '#0a1024', name: 'Аврора', mode: 'dark', p: ['#19b88f', '#5a57ee', '#b24fd6'] },
+  { id: 'night', c: '#090c1c', name: 'Тун', mode: 'dark', p: ['#1c2a6b', '#3a1d6e', '#0c4a5c'] },
+  { id: 'ocean', c: '#5db2f0', name: 'Океан', mode: 'light', p: ['#5db2f0', '#8fe8d8', '#a9c6ff'] },
+  { id: 'sunset', c: '#ff9a6a', name: 'Шафақ', mode: 'light', p: ['#ff9a6a', '#ff7fae', '#c78cff'] },
+  { id: 'forest', c: '#7fd49a', name: 'Ўрмон', mode: 'light', p: ['#7fd49a', '#5fc4a8', '#dcee8f'] },
+  { id: 'lavender', c: '#c4a8ff', name: 'Лаванда', mode: 'light', p: ['#c4a8ff', '#ffb8e0', '#b0c8ff'] }
 ];
 let S = load();
 const UI = {
@@ -81,7 +81,8 @@ const UI = {
   sel: today(),
   period: 7,
   rm: { title: '', deadline: '', perDay: 2, days: [0, 1, 2, 3, 4], tpl: 'blank', steps: '' },
-  plan: null
+  plan: null,
+  openGoals: new Set()
 };
 
 function load() {
@@ -98,6 +99,7 @@ function applyTheme() {
   const t = THEMES.find(x => x.id === S.theme) || THEMES[0];
   const root = document.documentElement;
   root.dataset.theme = t.id;
+  document.querySelector('meta[name=theme-color]').content = t.c;
   if (t.mode) root.dataset.mode = t.mode; else delete root.dataset.mode;
 }
 function renderThemes() {
@@ -134,14 +136,21 @@ function sortTasks(list) {
     ((a.date || '9999') < (b.date || '9999') ? -1 : (a.date || '9999') > (b.date || '9999') ? 1 : 0) ||
     (b.priority - a.priority) || (a.created - b.created));
 }
+function taskState(t) {
+  if (t.done) return 'st-done';
+  if (!t.date) return 'st-none';
+  const d = diffDays(today(), t.date);
+  return d < 0 ? 'st-late' : d === 0 ? 'st-today' : 'st-soon';
+}
 function taskHtml(t) {
   const dl = dateLabel(t);
-  return `<li class="task ${t.done ? 'done' : ''}">
+  return `<li class="task ${taskState(t)}" data-tid="${t.id}">
     <input type="checkbox" data-act="toggle" data-id="${t.id}" ${t.done ? 'checked' : ''} aria-label="Бажарилди">
     <div class="body">
-      <div class="t">${esc(t.title)}</div>
+      <div class="t"><span>${esc(t.title)}</span></div>
       <div class="meta">
-        ${dl ? `<span class="badge ${dl.cls}">${dl.text}</span>` : ''}
+        ${t.done ? `<span class="badge fin">✓ Бажарилди${t.doneAt ? ' ' + fmtShort(t.doneAt) : ''}</span>` : ''}
+        ${dl && !t.done ? `<span class="badge ${dl.cls}">${dl.text}</span>` : ''}
         <span class="badge p${t.priority}">${PRIO[t.priority]}</span>
         <span class="badge">${esc(t.cat)}</span>
         ${estOf(t) ? `<span class="badge">${hrs(estOf(t))} соат</span>` : ''}
@@ -167,6 +176,9 @@ function filtered() {
   const q = UI.q.trim().toLowerCase();
   return sortTasks(S.tasks.filter(t =>
     (!q || (t.title + ' ' + (t.notes || '')).toLowerCase().includes(q)) && matchesFilter(t)));
+}
+function refresh() {
+  if (UI.tab === 'roadmap') updateGoals(); else render();
 }
 function matchesFilter(t) {
   const td = today();
@@ -350,6 +362,7 @@ function renderReport() {
   const cats = catStats(cur.due);
   const tips = insights(cur, prev, from, to);
   const lateList = sortTasks(cur.open);
+  const finished = cur.doneAll.slice().sort((a, b) => b.doneAt.localeCompare(a.doneAt)).slice(0, 40);
 
   view.innerHTML = `
   <div class="seg" role="group" aria-label="Давр">
@@ -389,7 +402,8 @@ function renderReport() {
       <ul class="tips">${tips.length ? tips.map(t => `<li>${esc(t)}</li>`).join('') : '<li>Ҳозирча тавсия йўқ.</li>'}</ul>
     </section>
   </div>
-  ${lateList.length ? `<section class="card"><h2>Кечиккан ишлар</h2><ul class="list">${lateList.map(taskHtml).join('')}</ul></section>` : ''}`;
+  ${lateList.length ? `<section class="card"><h2>Кечиккан ишлар (${lateList.length})</h2><ul class="list">${lateList.map(taskHtml).join('')}</ul></section>` : ''}
+  ${finished.length ? `<section class="card"><h2>Бажарилган ишлар (${cur.doneAll.length})</h2><ul class="list">${finished.map(taskHtml).join('')}</ul></section>` : ''}`;
 }
 
 /* ---------- roadmap planner ---------- */
@@ -445,11 +459,6 @@ function buildPlan({ start, deadline, perDay, days, steps, load }) {
 function renderRoadmap() {
   const r = UI.rm;
   if (!r.deadline) r.deadline = addDays(today(), 30);
-  const goals = S.goals.map(g => {
-    const ts = S.tasks.filter(t => t.goalId === g.id);
-    const done = ts.filter(t => t.done).length;
-    return { ...g, total: ts.length, done, pct: ts.length ? Math.round((done / ts.length) * 100) : 0 };
-  });
   view.innerHTML = `
   <div class="rm-grid">
     <section class="card">
@@ -482,18 +491,32 @@ function renderRoadmap() {
     </section>
     <section>
       <div id="rmPreview"></div>
-      <section class="card">
-        <h2>Мақсадларим</h2>
-        ${goals.length ? goals.map(g => `<div class="goal">
-          <b>${esc(g.title)}</b> <span class="muted small">· муддат ${fmtShort(g.deadline)}</span>
-          <div class="progress"><i style="width:${g.pct}%"></i></div>
-          <span class="small muted">${g.done}/${g.total} қадам · ${g.pct}%</span>
-          <button class="link small" data-act="del-goal" data-id="${g.id}">ўчириш</button>
-        </div>`).join('') : '<p class="muted">Ҳозирча мақсад йўқ.</p>'}
-      </section>
+      <section class="card goals" id="goalsBox"></section>
     </section>
   </div>`;
   renderPreview();
+  updateGoals();
+}
+function goalsHtml() {
+  if (!S.goals.length) return '<h2>Мақсадларим</h2><p class="muted">Ҳозирча мақсад йўқ.</p>';
+  return '<h2>Мақсадларим</h2>' + S.goals.map(g => {
+    const ts = sortTasks(S.tasks.filter(t => t.goalId === g.id)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const done = ts.filter(t => t.done).length;
+    const pct = ts.length ? Math.round((done / ts.length) * 100) : 0;
+    return `<div class="goal">
+      <b>${esc(g.title)}</b> <span class="muted small">· муддат ${fmtShort(g.deadline)}</span>
+      <div class="progress"><i style="width:${pct}%"></i></div>
+      <span class="small muted">${done}/${ts.length} қадам · ${pct}%</span>
+      <button class="link small" data-act="del-goal" data-id="${g.id}">ўчириш</button>
+      <details data-gid="${g.id}" ${UI.openGoals.has(g.id) ? 'open' : ''}><summary>Қадамларни кўриш (${ts.length})</summary>
+        <ul class="list">${ts.map(taskHtml).join('')}</ul></details>
+    </div>`;
+  }).join('');
+}
+// Only the goals box is rebuilt so unsaved text in the planner form is never lost.
+function updateGoals() {
+  const box = document.getElementById('goalsBox');
+  if (box) box.innerHTML = goalsHtml();
 }
 function renderPreview() {
   const box = document.getElementById('rmPreview');
@@ -543,6 +566,7 @@ function applyPlan() {
   save();
   UI.plan = null;
   UI.rm.title = ''; UI.rm.steps = ''; UI.rm.tpl = 'blank';
+  UI.openGoals.add(goal.id);
   toast(`${p.items.length} та вазифа календарга қўшилди`);
   renderRoadmap();
 }
@@ -602,12 +626,15 @@ document.addEventListener('click', e => {
       t.done = el.checked;
       t.doneAt = t.done ? today() : null;
       save();
+      // Restyle the row in place so the strike-through and colour change animate;
+      // the lists are rebuilt a moment later so counters and groups stay correct.
       const row = el.closest('.task');
-      // In the task list a finished (or restored) task slides out; other views just refresh.
-      if (UI.tab === 'tasks' && row && !matchesFilter(t)) {
-        row.classList.add('leaving');
-        setTimeout(render, 280);
-      } else render();
+      if (row) row.className = `task ${taskState(t)}`;
+      const leaves = UI.tab === 'tasks' && row && !matchesFilter(t);
+      if (leaves) {
+        setTimeout(() => { if (!matchesFilter(byId(id)) && row.isConnected) row.classList.add('leaving'); }, 800);
+        setTimeout(refresh, 1100);
+      } else setTimeout(refresh, 500);
       return;
     }
     case 'edit': return openTask(id);
@@ -636,7 +663,7 @@ document.addEventListener('click', e => {
         S.goals = S.goals.filter(g => g.id !== id);
         S.tasks = S.tasks.filter(t => t.goalId !== id || t.done);
         S.tasks.forEach(t => { if (t.goalId === id) t.goalId = null; });
-        save(); renderRoadmap();
+        save(); updateGoals();
       }
       return;
     case 'export': {
@@ -648,6 +675,13 @@ document.addEventListener('click', e => {
     }
   }
 });
+
+document.addEventListener('toggle', e => {
+  if (e.target.matches('details[data-gid]')) {
+    const id = e.target.dataset.gid;
+    if (e.target.open) UI.openGoals.add(id); else UI.openGoals.delete(id);
+  }
+}, true);
 
 document.addEventListener('submit', e => {
   if (e.target.id === 'quick') {
