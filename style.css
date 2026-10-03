@@ -243,3 +243,11 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .sev.low { background: var(--accent-soft); color: var(--accent); }
 .meta .link { font-size: .8rem; }
 .seg { flex-wrap: wrap; }
+
+/* language select, start time */
+.lang-sel { width: auto; margin: 0 0 6px; padding: 4px 8px; border-radius: 99px; font-size: .85rem; background: var(--bg); }
+.badge.time { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.next { margin: 4px 0 0; font-size: .9rem; font-weight: 600; color: var(--accent); }
+.quick { grid-template-columns: 1fr 150px 110px auto; }
+@media (max-width: 760px) { .quick { grid-template-columns: 1fr 1fr; } .quick button { grid-column: 1 / -1; } }
+.top-row { flex-wrap: wrap; }

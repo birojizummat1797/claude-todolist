@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Режаларим — вазифалар рўйхати</title>
-<meta name="description" content="Календарь, ҳисобот ва йўл харитаси билан оддий вазифалар рўйхати">
+<title>Режаларим</title>
+<meta name="description" content="">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6fed'/%3E%3Cpath d='M9 17l5 5 9-11' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <meta name="theme-color" content="#2f6fed">
 <link rel="manifest" href="manifest.webmanifest">
@@ -14,88 +14,91 @@
 <body>
 <header class="top">
   <div class="top-row">
-    <h1>✔ Режаларим</h1>
-    <button class="theme-btn" id="themeBtn" aria-expanded="false" aria-controls="themes">🎨 Фон</button>
+    <h1>✔ <span data-i18n="Режаларим"></span></h1>
+    <select id="lang" class="lang-sel" aria-label="Тил / Language / Язык"></select>
+    <button class="theme-btn" id="themeBtn" aria-expanded="false" aria-controls="themes">🎨 <span data-i18n="Фон"></span></button>
   </div>
   <div class="themes" id="themes" hidden></div>
-  <nav class="tabs" role="tablist" aria-label="Бўлимлар">
-    <button role="tab" data-tab="tasks">Вазифалар</button>
-    <button role="tab" data-tab="habits">Одатлар</button>
-    <button role="tab" data-tab="calendar">Календарь</button>
-    <button role="tab" data-tab="roadmap">Режа</button>
-    <button role="tab" data-tab="report">Ҳисобот</button>
+  <nav class="tabs" role="tablist" data-i18n-aria="Бўлимлар">
+    <button role="tab" data-tab="tasks" data-i18n="Вазифалар"></button>
+    <button role="tab" data-tab="habits" data-i18n="Одатлар"></button>
+    <button role="tab" data-tab="calendar" data-i18n="Календарь"></button>
+    <button role="tab" data-tab="roadmap" data-i18n="Режа"></button>
+    <button role="tab" data-tab="report" data-i18n="Ҳисобот"></button>
   </nav>
 </header>
 
 <main id="view" tabindex="-1"></main>
 
 <footer class="foot">
-  <span>Маълумот фақат шу қурилмада сақланади. <span id="ver"></span></span>
-  <button class="link" data-act="export">Нусха олиш</button>
-  <label class="link">Тиклаш<input id="import" type="file" accept="application/json" hidden></label>
+  <span><span data-i18n="Маълумот фақат шу қурилмада сақланади."></span> <span id="ver"></span></span>
+  <button class="link" data-act="export" data-i18n="Нусха олиш"></button>
+  <label class="link"><span data-i18n="Тиклаш"></span><input id="import" type="file" accept="application/json" hidden></label>
 </footer>
 
 <dialog id="taskDlg">
   <form id="taskForm" method="dialog">
-    <h2 id="taskDlgTitle">Вазифа</h2>
-    <label>Номи
+    <h2 id="taskDlgTitle"></h2>
+    <label><span data-i18n="Номи"></span>
       <input name="title" required maxlength="200" autocomplete="off">
     </label>
-    <label>Изоҳ
+    <label><span data-i18n="Изоҳ"></span>
       <textarea name="notes" rows="2" maxlength="1000"></textarea>
     </label>
     <div class="row2">
-      <label>Муддат
+      <label><span data-i18n="Муддат"></span>
         <input type="date" name="date">
       </label>
-      <label>Тахминий вақт (соат)
-        <input type="number" name="est" min="0" max="24" step="0.25" placeholder="масалан, 1.5">
+      <label><span data-i18n="Бошланиш вақти"></span>
+        <input type="time" name="time">
       </label>
     </div>
     <div class="row2">
-      <label>Муҳимлиги
-        <select name="priority">
-          <option value="1">Паст</option>
-          <option value="2" selected>Ўрта</option>
-          <option value="3">Юқори</option>
-        </select>
+      <label><span data-i18n="Давомийлиги (соат)"></span>
+        <input type="number" name="est" min="0" max="24" step="0.25" data-i18n-ph="масалан, 1.5">
       </label>
-      <label>Тоифа
-        <select name="cat"></select>
+      <label><span data-i18n="Муҳимлиги"></span>
+        <select name="priority"></select>
       </label>
     </div>
+    <label><span data-i18n="Тоифа"></span>
+      <select name="cat"></select>
+    </label>
     <div class="actions">
-      <button type="button" class="danger" id="taskDel">Ўчириш</button>
+      <button type="button" class="danger" id="taskDel" data-i18n="Ўчириш"></button>
       <span class="grow"></span>
-      <button type="button" id="taskCancel">Бекор қилиш</button>
-      <button type="submit" class="primary">Сақлаш</button>
+      <button type="button" id="taskCancel" data-i18n="Бекор қилиш"></button>
+      <button type="submit" class="primary" data-i18n="Сақлаш"></button>
     </div>
   </form>
 </dialog>
 
 <dialog id="revDlg">
   <form id="revForm" method="dialog">
-    <h2>Кун якуни</h2>
-    <p class="muted small">Бугунни ўзинг баҳола. Ҳалол бўл: бу фақат ўзинг учун.</p>
-    <div class="rates" role="radiogroup" aria-label="Кун баҳоси">
+    <h2 data-i18n="Кун якуни"></h2>
+    <p class="muted small" data-i18n="Бугунни ўзинг баҳола. Ҳалол бўл: бу фақат ўзинг учун."></p>
+    <div class="rates" role="radiogroup" data-i18n-aria="Кун баҳоси">
       <label class="rate"><input type="radio" name="rating" value="1" required><span>😞<small>1</small></span></label>
       <label class="rate"><input type="radio" name="rating" value="2"><span>😕<small>2</small></span></label>
       <label class="rate"><input type="radio" name="rating" value="3"><span>😐<small>3</small></span></label>
       <label class="rate"><input type="radio" name="rating" value="4"><span>🙂<small>4</small></span></label>
       <label class="rate"><input type="radio" name="rating" value="5"><span>😄<small>5</small></span></label>
     </div>
-    <label>Нима яхши бўлди? Нима қийин бўлди? Эртага нимани яхшилайман?
+    <label><span data-i18n="Нима яхши бўлди? Нима қийин бўлди? Эртага нимани яхшилайман?"></span>
       <textarea name="note" rows="4" maxlength="1000"></textarea>
     </label>
     <div class="actions">
       <span class="grow"></span>
-      <button type="button" id="revCancel">Бекор қилиш</button>
-      <button type="submit" class="primary">Сақлаш</button>
+      <button type="button" id="revCancel" data-i18n="Бекор қилиш"></button>
+      <button type="submit" class="primary" data-i18n="Сақлаш"></button>
     </div>
   </form>
 </dialog>
 
 <div id="toast" role="status" aria-live="polite"></div>
+<script src="i18n.js"></script>
+<script src="i18n-ru.js"></script>
+<script src="i18n-en.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

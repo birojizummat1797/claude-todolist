@@ -1,7 +1,7 @@
 'use strict';
 // Bump CACHE when any cached file changes so installed copies refresh.
-const CACHE = 'rejalarim-v6';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
+const CACHE = 'rejalarim-v7';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'i18n.js', 'i18n-ru.js', 'i18n-en.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' })))).then(() => self.skipWaiting()));
