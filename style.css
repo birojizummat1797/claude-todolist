@@ -234,3 +234,12 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .rate input:checked + span { background: var(--accent-soft); border-color: var(--accent); }
 .note { border-left: 3px solid var(--accent); padding: 4px 10px; margin: 8px 0; font-size: .9rem; }
 .note b { display: block; font-size: .78rem; color: var(--muted); font-weight: 600; }
+
+.flaw { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; font-size: .9rem; }
+.flaw b { font-size: .95rem; }
+.sev { flex: none; font-size: .7rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; margin-top: 2px; min-width: 64px; text-align: center; }
+.sev.high { background: var(--bad); color: #fff; }
+.sev.mid { background: var(--warn); color: #fff; }
+.sev.low { background: var(--accent-soft); color: var(--accent); }
+.meta .link { font-size: .8rem; }
+.seg { flex-wrap: wrap; }

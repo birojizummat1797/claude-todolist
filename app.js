@@ -2,7 +2,7 @@
 
 /* ---------- constants ---------- */
 const KEY = 'todolist.v1';
-const VERSION = '5';
+const VERSION = '6';
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WD = ['Душ', 'Сей', 'Чор', 'Пай', 'Жум', 'Шан', 'Якш'];
 const WD_FULL = ['Душанба', 'Сешанба', 'Чоршанба', 'Пайшанба', 'Жума', 'Шанба', 'Якшанба'];
@@ -137,6 +137,11 @@ function sortTasks(list) {
     ((a.date || '9999') < (b.date || '9999') ? -1 : (a.date || '9999') > (b.date || '9999') ? 1 : 0) ||
     (b.priority - a.priority) || (a.created - b.created));
 }
+// Postponing a task that is already due is recorded, so it still counts against the score.
+function reschedule(t, nd) {
+  if (t.date && t.date <= today() && (!nd || nd > t.date)) { t.origDate = t.origDate || t.date; t.moved = (t.moved || 0) + 1; }
+  t.date = nd;
+}
 const isFocus = t => t.focus === today() && !t.done;
 function taskState(t) {
   if (t.done) return 'st-done';
@@ -157,8 +162,13 @@ function taskHtml(t) {
         <span class="badge">${esc(t.cat)}</span>
         ${estOf(t) ? `<span class="badge">${hrs(estOf(t))} соат</span>` : ''}
         ${t.goalId ? '<span class="badge">🎯 мақсад</span>' : ''}
+        ${t.moved ? `<span class="badge late">↻ ${t.moved} марта сурилган</span>` : ''}
       </div>
       ${t.notes ? `<div class="meta">${esc(t.notes)}</div>` : ''}
+      ${!t.done && (taskState(t) === 'st-late' || taskState(t) === 'st-today') ? `<div class="meta">
+        ${taskState(t) === 'st-late' ? `<button class="link" data-act="resched" data-id="${t.id}" data-to="0">Бугунга кўчириш</button>` : ''}
+        <button class="link" data-act="resched" data-id="${t.id}" data-to="1">Эртага</button>
+        <button class="link" data-act="edit" data-id="${t.id}">Санани танлаш</button></div>` : ''}
     </div>
     ${t.done ? '' : `<button class="icon star ${isFocus(t) ? 'on' : ''}" data-act="focus" data-id="${t.id}" aria-label="Бугунги фокус" title="Бугунги фокус">${isFocus(t) ? '★' : '☆'}</button>`}
     <button class="icon" data-act="edit" data-id="${t.id}" aria-label="Таҳрирлаш">✎</button>
@@ -355,19 +365,26 @@ function renderCalendar() {
 }
 
 /* Report */
+// A postponed task is still judged by its ORIGINAL due date, so moving a date cannot hide a miss.
+const scoreDate = t => t.origDate || t.date;
 function stats(from, to) {
   const days = diffDays(from, to) + 1;
   // A task due today that is still open is not late yet, so it is left out of the score.
-  const due = S.tasks.filter(t => t.date && t.date >= from && t.date <= to && (t.done || t.date < today()));
+  const due = S.tasks.filter(t => { const d = scoreDate(t); return d && d >= from && d <= to && (t.done || d < today()); });
   const done = due.filter(t => t.done);
-  const onTime = done.filter(t => t.doneAt && t.doneAt <= t.date);
+  const onTime = done.filter(t => t.doneAt && t.doneAt <= scoreDate(t));
   const doneAll = S.tasks.filter(t => t.done && t.doneAt && t.doneAt >= from && t.doneAt <= to);
   const activeDays = new Set(doneAll.map(t => t.doneAt)).size;
   const cr = due.length ? done.length / due.length : 0;
   const ot = done.length ? onTime.length / done.length : 0;
   const act = Math.min(1, activeDays / (days * 0.7));
-  const score = due.length ? Math.round(100 * (0.6 * cr + 0.25 * ot + 0.15 * act)) : null;
-  return { days, due, done, onTime, doneAll, activeDays, cr, ot, act, score, open: due.filter(pending) };
+  const hasH = S.habits.length > 0;
+  const habits = hasH ? S.habits.reduce((a, h) => a + habitRate(h, days), 0) / S.habits.length / 100 : 0;
+  let score = null;
+  if (due.length) score = Math.round(100 * (hasH ? 0.5 * cr + 0.2 * ot + 0.1 * act + 0.2 * habits : 0.6 * cr + 0.25 * ot + 0.15 * act));
+  else if (hasH) score = Math.round(100 * habits);
+  const moved = due.filter(t => t.moved > 0);
+  return { days, due, done, onTime, doneAll, activeDays, cr, ot, act, habits, hasH, score, moved, open: due.filter(pending) };
 }
 function grade(s) {
   if (s === null) return { l: '—', t: 'Маълумот етарли эмас', c: 'var(--muted)' };
@@ -385,39 +402,64 @@ function streak() {
   while (set.has(d)) { n++; d = addDays(d, -1); }
   return n;
 }
-function insights(cur, prev, from, to) {
-  const tips = [];
-  if (cur.due.length === 0) {
-    tips.push('Бу даврда муддатли вазифа йўқ. Баҳо бериш учун вазифаларга сана қўйинг.');
-    return tips;
+const SEV = { high: { n: 'Жиддий', o: 0 }, mid: { n: 'Ўртача', o: 1 }, low: { n: 'Енгил', o: 2 } };
+function analyze(cur, prev) {
+  const bad = [];
+  const good = [];
+  const add = (sev, title, text) => bad.push({ sev, title, text });
+  if (!cur.due.length && !cur.hasH) return { bad, good };
+  if (cur.due.length) {
+    const ratio = cur.open.length / cur.due.length;
+    if (cur.open.length) add(ratio >= 0.4 ? 'high' : ratio >= 0.2 ? 'mid' : 'low', 'Бажарилмаган ишлар',
+      `Муддати ўтган ${cur.open.length} та иш бажарилмаган (${Math.round(ratio * 100)}%). Ҳақиқатан керак эмасини ўчиринг, керагини аниқ вақт билан режалаштиринг.`);
+    if (cur.done.length && cur.ot < 0.85) add(cur.ot < 0.5 ? 'high' : cur.ot < 0.7 ? 'mid' : 'low', 'Вақтида бажарилмаган',
+      `Бажарилганларнинг фақат ${Math.round(cur.ot * 100)}% вақтида тугаган. Муддатларни реалистикроқ қўйинг (тахминий вақтга 20% қўшинг).`);
+    if (cur.moved.length) add(cur.moved.length >= 3 || cur.moved.length / cur.due.length > 0.3 ? 'high' : cur.moved.length >= 2 ? 'mid' : 'low', 'Кечиктирилган ишлар',
+      `${cur.moved.length} та иш бошқа кунга суриб қўйилган. Сурилганлар дастлабки муддати бўйича баҳоланади. Иш кўп бўлса, камроқ вазифа қўйинг.`);
+    const hiOpen = cur.open.filter(t => t.priority === 3).length;
+    if (hiOpen) add('high', 'Муҳим ишлар қолиб кетган', `«Юқори» муҳимликдаги ${hiOpen} та иш бажарилмаган. Эртага энг аввал шуларни қилинг.`);
+    const cats = catStats(cur.due).filter(c => c.total >= 2).sort((a, b) => a.rate - b.rate);
+    if (cats.length && cats[0].rate < 0.5) add('mid', `«${cats[0].cat}» йўналиши суст`, `Бу тоифада ишларнинг фақат ${Math.round(cats[0].rate * 100)}% бажарилган. Унга алоҳида вақт ажратинг.`);
   }
-  if (prev.score !== null) {
-    const diff = cur.score - prev.score;
-    tips.push(diff > 0 ? `Олдинги даврга нисбатан +${diff} балл яхшиланиш. Давом этинг.` :
-      diff < 0 ? `Олдинги даврга нисбатан ${diff} балл пасайиш. Сабабини ўйлаб кўринг: вазифалар кўпми ёки вақт камми?` :
-        'Натижа олдинги давр билан бир хил.');
+  if (cur.hasH) {
+    const worst = S.habits.map(h => ({ h, r: habitRate(h, cur.days) })).sort((a, b) => a.r - b.r)[0];
+    if (worst.r < 85) add(worst.r < 50 ? 'high' : worst.r < 70 ? 'mid' : 'low', 'Одатда узилиш', `«${worst.h.title}» одати ${worst.r}% бажарилган. Занжирни узмаслик учун уни кунинг бошига қўйинг.`);
   }
-  if (cur.open.length) tips.push(`Бажарилмаган ва муддати ўтган иш: ${cur.open.length} та. Уларни бугунга кўчиринг ёки ҳақиқатан керак эмасини ўчиринг.`);
-  if (cur.done.length && cur.ot < 0.7) tips.push(`Бажарилганларнинг фақат ${Math.round(cur.ot * 100)}% вақтида битган. Муддатларни реалистикроқ қўйинг (тахминий вақтга 20% қўшиб).`);
+  if (cur.days >= 7 && cur.activeDays < cur.days * 0.4) add(cur.activeDays < cur.days * 0.2 ? 'high' : 'mid', 'Фаол кунлар кам', `${cur.days} кундан фақат ${cur.activeDays} кун иш бажарилган. Ҳар куни камида битта кичик иш қилинг.`);
+  const td = today();
+  const over = [];
+  for (let i = 0; i < 7; i++) if (dayLoad(addDays(td, i)) > S.capacity) over.push(addDays(td, i));
+  if (over.length) add('low', 'Келгуси кунларда ортиқча юклама', `${over.map(fmtShort).join(', ')} кунларида иш лимитдан ошиб кетган. Бир қисмини бошқа кунга олдиндан суринг.`);
+  const revs = Object.entries(S.reviews).filter(([d]) => d >= addDays(td, -(cur.days - 1)));
+  if (cur.days >= 7 && !revs.length) add('low', 'Кун якуни ёзилмаган', 'Кечқурун 1 дақиқа ўзингизни баҳоланг: бу интизомнинг энг кучли воситаси.');
+  else if (revs.length >= 3 && revs.reduce((a, [, r]) => a + r.rating, 0) / revs.length < 3) add('mid', 'Ўзингизни паст баҳоляпсиз', 'Кун баҳолари ўртача 3 дан паст. Сабабини изоҳларда ёзинг ва кўпроқ дам беринг.');
+  // strengths
+  if (cur.score !== null && prev.score !== null && cur.score > prev.score) good.push(`Олдинги даврга нисбатан +${cur.score - prev.score} балл яхшиланиш.`);
+  if (cur.due.length && cur.cr === 1) good.push('Муддати келган ҳамма иш бажарилган.');
+  if (cur.done.length >= 3 && cur.ot >= 0.9) good.push('Ишларнинг деярли ҳаммаси ўз вақтида битган.');
+  if (cur.hasH && cur.habits >= 0.9) good.push('Одатларда жуда барқарорсиз.');
+  const st = streak();
+  if (st >= 3) good.push(`Узлуксиз ${st} кун иш бажаряпсиз.`);
   const byWd = Array(7).fill(0);
   cur.doneAll.forEach(t => byWd[wdIndex(t.doneAt)]++);
   const max = Math.max(...byWd);
-  if (max > 1) tips.push(`Энг унумли кунингиз: ${WD_FULL[byWd.indexOf(max)]}. Муҳим ишларни шу кунга қўйинг.`);
-  const cats = catStats(cur.due).filter(c => c.total >= 2).sort((a, b) => a.rate - b.rate);
-  if (cats.length && cats[0].rate < 0.5) tips.push(`«${cats[0].cat}» тоифасида кўп иш қолиб кетяпти (${Math.round(cats[0].rate * 100)}%). Бу йўналишга алоҳида вақт ажратинг.`);
-  const s = streak();
-  if (s >= 3) tips.push(`Узлуксиз ${s} кун вазифа бажаряпсиз. Бу яхши одат!`);
-  else if (cur.activeDays < cur.days * 0.4) tips.push('Бажариш кунлари кам. Ҳар куни битта кичик иш қилишга ҳаракат қилинг, узлуксизлик муҳим.');
-  const td = today();
-  const upcoming = S.tasks.filter(t => !t.done && t.date && t.date > td && t.date <= addDays(td, 7)).length;
-  if (!upcoming) tips.push('Келгуси 7 кунга режа йўқ. «Режа» бўлимида мақсад қўйиб, йўл харитаси тузинг.');
-  if (cur.score >= 90 && !cur.open.length) tips.push('Ажойиб давр! Энди мураккаброқ мақсад қўйиш мумкин.');
-  return tips;
+  if (max > 1) good.push(`Энг унумли кунингиз: ${WD_FULL[byWd.indexOf(max)]}. Муҳим ишларни шу кунга қўйинг.`);
+  bad.sort((a, b) => SEV[a.sev].o - SEV[b.sev].o);
+  return { bad, good };
 }
 function catStats(list) {
   const map = {};
   list.forEach(t => { (map[t.cat] ||= { cat: t.cat, total: 0, done: 0 }); map[t.cat].total++; if (t.done) map[t.cat].done++; });
   return Object.values(map).map(c => ({ ...c, rate: c.done / c.total })).sort((a, b) => b.total - a.total);
+}
+const PERIODS = { 1: { b: 'Кунлик', t: 'бугун' }, 7: { b: 'Ҳафталик', t: 'сўнгги 7 кунда' }, 15: { b: '15 кунлик', t: 'сўнгги 15 кунда' }, 30: { b: 'Ойлик', t: 'сўнгги 30 кунда' } };
+function narrative(cur, prev, g) {
+  const p = PERIODS[UI.period];
+  if (cur.score === null) return `${p.t[0].toUpperCase() + p.t.slice(1)} баҳо учун маълумот йўқ. Вазифаларга сана қўйинг ёки одат қўшинг.`;
+  let t = `Сиз ${p.t} ${cur.score}% натижа қайд этдингиз (${g.l} — ${g.t}).`;
+  if (cur.due.length) t += ` Муддати келган ${cur.due.length} та ишдан ${cur.done.length} таси бажарилди.`;
+  if (prev.score !== null) t += cur.score > prev.score ? ` Олдинги даврдан ${cur.score - prev.score} балл яхши.` : cur.score < prev.score ? ` Олдинги даврдан ${prev.score - cur.score} балл паст.` : ' Олдинги давр билан бир хил.';
+  return t;
 }
 function renderReport() {
   const to = today();
@@ -432,14 +474,13 @@ function renderReport() {
   }
   const maxN = Math.max(1, ...perDay.map(x => x.n));
   const cats = catStats(cur.due);
-  const tips = insights(cur, prev, from, to);
+  const an = analyze(cur, prev);
   const lateList = sortTasks(cur.open);
   const finished = cur.doneAll.slice().sort((a, b) => b.doneAt.localeCompare(a.doneAt)).slice(0, 40);
 
   view.innerHTML = `
   <div class="seg" role="group" aria-label="Давр">
-    <button data-act="period" data-n="7" aria-pressed="${UI.period === 7}">7 кун</button>
-    <button data-act="period" data-n="30" aria-pressed="${UI.period === 30}">30 кун</button>
+    ${Object.entries(PERIODS).map(([n, p]) => `<button data-act="period" data-n="${n}" aria-pressed="${UI.period === Number(n)}">${p.b}</button>`).join('')}
   </div>
   <section class="card">
     <h2>Умумий баҳо · ${fmtShort(from)} – ${fmtShort(to)}</h2>
@@ -448,30 +489,34 @@ function renderReport() {
       <div>
         <div style="font-size:1.4rem;font-weight:700;color:${g.c}">${g.l} · ${g.t}</div>
         ${prev.score !== null && cur.score !== null ? `<div class="muted small">Олдинги давр: ${prev.score}</div>` : ''}
-        <div class="formula">Баҳо = 60% бажарилган улуши + 25% вақтида бажарилиши + 15% фаол кунлар. Фақат шу даврда муддати бор вазифалар ҳисобга олинади.</div>
+        <div class="formula">${cur.hasH ? 'Баҳо = 50% бажарилган ишлар + 20% вақтида бажариш + 10% фаол кунлар + 20% одатлар.' : 'Баҳо = 60% бажарилган ишлар + 25% вақтида бажариш + 15% фаол кунлар.'} Сурилган иш дастлабки муддати бўйича ҳисобланади.</div>
       </div>
     </div>
     <div class="kpis">
       <div class="kpi"><b>${cur.done.length}/${cur.due.length}</b><span>бажарилди</span></div>
       <div class="kpi"><b>${Math.round(cur.ot * 100)}%</b><span>вақтида бажарилган</span></div>
-      <div class="kpi"><b>${cur.open.length}</b><span>кечиккан</span></div>
+      <div class="kpi"><b>${cur.open.length}</b><span>бажарилмаган</span></div>
+      <div class="kpi"><b>${cur.moved.length}</b><span>кечиктирилган</span></div>
       <div class="kpi"><b>${cur.activeDays}/${cur.days}</b><span>фаол кун</span></div>
       <div class="kpi"><b>${streak()}</b><span>кун узлуксиз</span></div>
     </div>
   </section>
-  <section class="card">
+  ${UI.period > 1 ? `  <section class="card">
     <h2>Кунлар бўйича бажарилган ишлар</h2>
     <div class="bars">${perDay.map(x => `<div class="bar ${x.n ? '' : 'zero'}" style="height:${(x.n / maxN) * 100}%" title="${fmtShort(x.d)}: ${x.n}"></div>`).join('')}</div>
-    <div class="axis">${perDay.map((x, i) => `<span>${UI.period === 7 || i % 5 === 0 ? fmtShort(x.d) : ''}</span>`).join('')}</div>
-  </section>
+    <div class="axis">${perDay.map((x, i) => `<span>${UI.period <= 7 || i % 5 === 0 ? fmtShort(x.d) : ''}</span>`).join('')}</div>
+  </section>` : ''}
   <div class="rm-grid">
     <section class="card">
       <h2>Тоифалар бўйича</h2>
       ${cats.length ? cats.map(c => `<div class="rowbar"><span>${esc(c.cat)}</span><div class="track"><i style="width:${c.rate * 100}%"></i></div><span>${c.done}/${c.total}</span></div>`).join('') : '<p class="muted">Маълумот йўқ.</p>'}
     </section>
     <section class="card">
-      <h2>Хулоса ва тавсиялар</h2>
-      <ul class="tips">${tips.length ? tips.map(t => `<li>${esc(t)}</li>`).join('') : '<li>Ҳозирча тавсия йўқ.</li>'}</ul>
+      <h2>Хулоса</h2>
+      <p>${esc(narrative(cur, prev, g))}</p>
+      ${an.good.length ? `<h3>Яхши томонлар</h3><ul class="tips">${an.good.map(t => `<li>✅ ${esc(t)}</li>`).join('')}</ul>` : ''}
+      <h3>Камчиликлар ${an.bad.length ? `(${an.bad.length})` : ''}</h3>
+      ${an.bad.length ? an.bad.map(b => `<div class="flaw"><span class="sev ${b.sev}">${SEV[b.sev].n}</span><div><b>${esc(b.title)}</b><br>${esc(b.text)}</div></div>`).join('') : '<p class="muted">Жиддий камчилик топилмади. Баракалла!</p>'}
     </section>
   </div>
   ${S.habits.length ? `<section class="card"><h2>Одатлар (${UI.period} кун)</h2>
@@ -483,7 +528,7 @@ function renderReport() {
     return `<section class="card"><h2>Кун якунлари</h2><p class="muted small">${rs.length} кун баҳоланган, ўртача ${avg.toFixed(1).replace('.', ',')}/5</p>
       ${rs.filter(([, r]) => r.note).slice(0, 5).map(([d, r]) => `<div class="note"><b>${fmtShort(d)} · ${'★'.repeat(r.rating)}</b>${esc(r.note)}</div>`).join('')}</section>`;
   })()}
-  ${lateList.length ? `<section class="card"><h2>Кечиккан ишлар (${lateList.length})</h2><ul class="list">${lateList.map(taskHtml).join('')}</ul></section>` : ''}
+  ${lateList.length ? `<section class="card"><h2>Бажарилмаган ишлар (${lateList.length})</h2><ul class="list">${lateList.map(taskHtml).join('')}</ul></section>` : ''}
   ${finished.length ? `<section class="card"><h2>Бажарилган ишлар (${cur.doneAll.length})</h2><ul class="list">${finished.map(taskHtml).join('')}</ul></section>` : ''}`;
 }
 
@@ -675,7 +720,13 @@ form.addEventListener('submit', e => {
     est: form.est.value ? Number(form.est.value) : '', priority: Number(form.priority.value), cat: form.cat.value
   };
   if (!data.title) return;
-  if (editingId) Object.assign(byId(editingId), data);
+  if (editingId) {
+    const t = byId(editingId);
+    const nd = data.date;
+    data.date = t.date;
+    Object.assign(t, data);
+    if (nd !== t.date) { if (t.done) t.date = nd; else reschedule(t, nd); }
+  }
   else S.tasks.push({ id: uid(), ...data, done: false, doneAt: null, created: Date.now() });
   save(); dlg.close(); render();
 });
@@ -762,8 +813,13 @@ document.addEventListener('click', e => {
     case 'add-on-day': return openTask(null, { date: UI.sel });
     case 'move-late': {
       const td = today();
-      S.tasks.forEach(t => { if (!t.done && t.date && t.date < td) t.date = td; });
-      save(); toast('Кечиккан ишлар бугунга кўчирилди'); return render();
+      S.tasks.forEach(t => { if (!t.done && t.date && t.date < td) reschedule(t, td); });
+      save(); toast('Бугунга кўчирилди. Сурилган ишлар дастлабки муддати бўйича баҳоланади'); return render();
+    }
+    case 'resched': {
+      const t = byId(id);
+      reschedule(t, addDays(today(), Number(el.dataset.to)));
+      save(); toast(el.dataset.to === '0' ? 'Бугунга кўчирилди' : 'Эртага кўчирилди'); return render();
     }
     case 'period': UI.period = Number(el.dataset.n); return render();
     case 'apply-plan': return applyPlan();
@@ -844,6 +900,8 @@ document.addEventListener('change', e => {
   }
 });
 
+// Ask the browser not to evict our data when storage is low.
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 applyTheme();
 renderThemes();
 document.getElementById('ver').textContent = `· Версия ${VERSION}`;
