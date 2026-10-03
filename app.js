@@ -2,6 +2,7 @@
 
 /* ---------- constants ---------- */
 const KEY = 'todolist.v1';
+const VERSION = '5';
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 const WD = ['Душ', 'Сей', 'Чор', 'Пай', 'Жум', 'Шан', 'Якш'];
 const WD_FULL = ['Душанба', 'Сешанба', 'Чоршанба', 'Пайшанба', 'Жума', 'Шанба', 'Якшанба'];
@@ -62,7 +63,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 /* ---------- state ---------- */
-const defaultState = () => ({ tasks: [], goals: [], capacity: 6, theme: 'auto' });
+const defaultState = () => ({ tasks: [], goals: [], capacity: 6, theme: 'auto', habits: [], reviews: {} });
 const THEMES = [
   { id: 'auto', c: '#2f6fed', name: 'Оддий', mode: '', p: ['#dbe6ff', '#eddfff', '#d9f3e6'] },
   { id: 'aurora', c: '#0a1024', name: 'Аврора', mode: 'dark', p: ['#19b88f', '#5a57ee', '#b24fd6'] },
@@ -136,6 +137,7 @@ function sortTasks(list) {
     ((a.date || '9999') < (b.date || '9999') ? -1 : (a.date || '9999') > (b.date || '9999') ? 1 : 0) ||
     (b.priority - a.priority) || (a.created - b.created));
 }
+const isFocus = t => t.focus === today() && !t.done;
 function taskState(t) {
   if (t.done) return 'st-done';
   if (!t.date) return 'st-none';
@@ -158,6 +160,7 @@ function taskHtml(t) {
       </div>
       ${t.notes ? `<div class="meta">${esc(t.notes)}</div>` : ''}
     </div>
+    ${t.done ? '' : `<button class="icon star ${isFocus(t) ? 'on' : ''}" data-act="focus" data-id="${t.id}" aria-label="Бугунги фокус" title="Бугунги фокус">${isFocus(t) ? '★' : '☆'}</button>`}
     <button class="icon" data-act="edit" data-id="${t.id}" aria-label="Таҳрирлаш">✎</button>
   </li>`;
 }
@@ -167,7 +170,7 @@ const view = document.getElementById('view');
 
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === UI.tab));
-  ({ tasks: renderTasks, calendar: renderCalendar, roadmap: renderRoadmap, report: renderReport })[UI.tab]();
+  ({ tasks: renderTasks, habits: renderHabits, calendar: renderCalendar, roadmap: renderRoadmap, report: renderReport })[UI.tab]();
 }
 
 /* Tasks */
@@ -175,7 +178,8 @@ const FILTERS = [['all', 'Фаол'], ['today', 'Бугун'], ['late', 'Кеч�
 function filtered() {
   const q = UI.q.trim().toLowerCase();
   return sortTasks(S.tasks.filter(t =>
-    (!q || (t.title + ' ' + (t.notes || '')).toLowerCase().includes(q)) && matchesFilter(t)));
+    (!q || (t.title + ' ' + (t.notes || '')).toLowerCase().includes(q)) && matchesFilter(t) &&
+    !(isFocus(t) && (UI.filter === 'all' || UI.filter === 'today'))));
 }
 function refresh() {
   if (UI.tab === 'roadmap') updateGoals(); else render();
@@ -190,11 +194,34 @@ function matchesFilter(t) {
     default: return !t.done;
   }
 }
+function summaryHtml() {
+  const td = today();
+  const doneToday = S.tasks.filter(t => t.done && t.doneAt === td).length;
+  const openNow = S.tasks.filter(t => !t.done && t.date && t.date <= td).length;
+  const st = streak();
+  const rev = S.reviews[td];
+  const msg = !doneToday && !openNow ? 'Бугунга режа қўйинг: энг муҳим 1–3 та ишни танланг.' :
+    openNow === 0 ? 'Бугунги ишлар тугади. Баракалла!' :
+    doneToday === 0 ? `Бугун ${openNow} та иш кутяпти. Биринчисидан бошланг.` :
+    `${doneToday} та бажарилди, ${openNow} та қолди. Давом этинг.`;
+  return `<section class="card today-card">
+    <div class="grow"><p class="big">Бугун, ${fmtLong(td)}</p><p class="muted">${msg}</p></div>
+    ${st ? `<span class="fire">🔥 ${st} кун</span>` : ''}
+    <button class="ghost" data-act="review">${rev ? `Кун якуни: ${'★'.repeat(rev.rating)}` : 'Кун якуни'}</button>
+  </section>`;
+}
+function focusHtml() {
+  const list = S.tasks.filter(isFocus);
+  return `<section class="card"><h2>⭐ Бугунги фокус (${list.length}/3)</h2>
+    ${list.length ? `<ul class="list">${list.map(taskHtml).join('')}</ul>` : '<p class="hint">Энг муҳим 1–3 та ишни ☆ тугмаси билан танланг. Кун охирида шулар асосий мезон бўлади.</p>'}</section>`;
+}
 function renderTasks() {
   const list = filtered();
   const open = S.tasks.filter(pending).length;
   const late = S.tasks.filter(t => !t.done && t.date && t.date < today()).length;
   view.innerHTML = `
+  ${summaryHtml()}
+  ${focusHtml()}
   <section class="card">
     <form class="quick" id="quick">
       <input name="title" placeholder="Янги вазифа..." required maxlength="200" autocomplete="off" aria-label="Вазифа номи">
@@ -208,6 +235,51 @@ function renderTasks() {
     <p class="muted small">Очиқ: ${open} · Кечиккан: ${late}</p>
     ${list.length ? `<ul class="list">${list.map(taskHtml).join('')}</ul>` : `<p class="empty">${UI.filter === 'done' ? 'Ҳали бажарилган вазифа йўқ.' : 'Фаол вазифа йўқ. Янгисини қўшинг!'}</p>`}
     ${S.tasks.some(t => t.done) ? '<button class="link small" data-act="clear-done">Бажарилганларни тозалаш</button>' : ''}
+  </section>`;
+}
+
+/* Habits */
+const habitDone = (h, d) => h.days.includes(d);
+function habitStreak(h) {
+  let d = today();
+  if (!habitDone(h, d)) d = addDays(d, -1);
+  let n = 0;
+  while (habitDone(h, d)) { n++; d = addDays(d, -1); }
+  return n;
+}
+function habitRate(h, n) {
+  const from = addDays(today(), -(n - 1));
+  const start = h.created > from ? h.created : from;
+  const span = diffDays(start, today()) + 1;
+  return Math.round((h.days.filter(d => d >= start && d <= today()).length / span) * 100);
+}
+function renderHabits() {
+  const td = today();
+  const dots = h => Array.from({ length: 7 }, (_, i) => `<i class="${habitDone(h, addDays(td, i - 6)) ? 'on' : ''}"></i>`).join('');
+  const doneN = S.habits.filter(h => habitDone(h, td)).length;
+  view.innerHTML = `
+  <section class="card">
+    <h2>Кунлик одатлар</h2>
+    <p class="muted small">Ҳар куни такрорланадиган ишлар: намоз, спорт, китоб, сув. Мақсад — занжирни узмаслик.</p>
+    <form class="quick" id="habitForm" style="grid-template-columns:1fr auto">
+      <input name="title" placeholder="Янги одат..." required maxlength="80" autocomplete="off" aria-label="Одат номи">
+      <button class="primary" type="submit">Қўшиш</button>
+    </form>
+    ${S.habits.length ? `<p class="muted small" style="margin-top:12px">Бугун: ${doneN}/${S.habits.length}</p>
+    <ul class="list">${S.habits.map(h => {
+      const ok = habitDone(h, td);
+      const st = habitStreak(h);
+      return `<li class="task ${ok ? 'st-done' : 'st-today'}">
+        <input type="checkbox" data-act="habit" data-id="${h.id}" ${ok ? 'checked' : ''} aria-label="Бугун бажарилди">
+        <div class="body">
+          <div class="t">${esc(h.title)}</div>
+          <div class="meta"><span class="dots" title="Сўнгги 7 кун">${dots(h)}</span>
+            <span class="badge">${st ? '🔥 ' + st + ' кун' : 'занжир йўқ'}</span>
+            <span class="badge">30 кун: ${habitRate(h, 30)}%</span></div>
+        </div>
+        <button class="icon" data-act="habit-del" data-id="${h.id}" aria-label="Ўчириш">✕</button>
+      </li>`;
+    }).join('')}</ul>` : '<p class="empty">Ҳали одат қўшилмаган.</p>'}
   </section>`;
 }
 
@@ -402,6 +474,15 @@ function renderReport() {
       <ul class="tips">${tips.length ? tips.map(t => `<li>${esc(t)}</li>`).join('') : '<li>Ҳозирча тавсия йўқ.</li>'}</ul>
     </section>
   </div>
+  ${S.habits.length ? `<section class="card"><h2>Одатлар (${UI.period} кун)</h2>
+    ${S.habits.map(h => `<div class="rowbar"><span>${esc(h.title)}</span><div class="track"><i style="width:${habitRate(h, UI.period)}%"></i></div><span>${habitRate(h, UI.period)}%</span></div>`).join('')}</section>` : ''}
+  ${(() => {
+    const rs = Object.entries(S.reviews).filter(([d]) => d >= from && d <= to).sort((a, b) => b[0].localeCompare(a[0]));
+    if (!rs.length) return '';
+    const avg = rs.reduce((a, [, r]) => a + r.rating, 0) / rs.length;
+    return `<section class="card"><h2>Кун якунлари</h2><p class="muted small">${rs.length} кун баҳоланган, ўртача ${avg.toFixed(1).replace('.', ',')}/5</p>
+      ${rs.filter(([, r]) => r.note).slice(0, 5).map(([d, r]) => `<div class="note"><b>${fmtShort(d)} · ${'★'.repeat(r.rating)}</b>${esc(r.note)}</div>`).join('')}</section>`;
+  })()}
   ${lateList.length ? `<section class="card"><h2>Кечиккан ишлар (${lateList.length})</h2><ul class="list">${lateList.map(taskHtml).join('')}</ul></section>` : ''}
   ${finished.length ? `<section class="card"><h2>Бажарилган ишлар (${cur.doneAll.length})</h2><ul class="list">${finished.map(taskHtml).join('')}</ul></section>` : ''}`;
 }
@@ -605,6 +686,22 @@ document.getElementById('taskDel').onclick = () => {
   save(); dlg.close(); render();
 };
 
+/* ---------- end-of-day review ---------- */
+const revDlg = document.getElementById('revDlg');
+const revForm = document.getElementById('revForm');
+function openReview() {
+  const r = S.reviews[today()];
+  revForm.reset();
+  if (r) { revForm.rating.value = r.rating; revForm.note.value = r.note || ''; }
+  revDlg.showModal();
+}
+revForm.addEventListener('submit', e => {
+  e.preventDefault();
+  S.reviews[today()] = { rating: Number(revForm.rating.value), note: revForm.note.value.trim() };
+  save(); revDlg.close(); toast('Кун якуни сақланди'); render();
+});
+document.getElementById('revCancel').onclick = () => revDlg.close();
+
 /* ---------- events ---------- */
 document.getElementById('themeBtn').addEventListener('click', e => {
   const box = document.getElementById('themes');
@@ -630,6 +727,26 @@ document.addEventListener('click', e => {
       return;
     }
     case 'edit': return openTask(id);
+    case 'focus': {
+      const t = byId(id);
+      if (isFocus(t)) t.focus = '';
+      else if (S.tasks.filter(isFocus).length >= 3) return toast('Фокусда 3 тадан ортиқ иш бўлмасин. Бирини олиб ташланг.');
+      else t.focus = today();
+      save(); return render();
+    }
+    case 'review': return openReview();
+    case 'habit': {
+      const h = S.habits.find(x => x.id === id);
+      const td = today();
+      h.days = h.days.filter(d => d !== td);
+      if (el.checked) h.days.push(td);
+      save(); return render();
+    }
+    case 'habit-del':
+      if (confirm('Одат ўчирилсинми? Унинг тарихи ҳам йўқолади.')) {
+        S.habits = S.habits.filter(h => h.id !== id); save(); render();
+      }
+      return;
     case 'theme':
       S.theme = id; save(); applyTheme(); renderThemes(); return;
     case 'filter': UI.filter = el.dataset.k; return render();
@@ -676,6 +793,13 @@ document.addEventListener('toggle', e => {
 }, true);
 
 document.addEventListener('submit', e => {
+  if (e.target.id === 'habitForm') {
+    e.preventDefault();
+    S.habits.push({ id: uid(), title: String(new FormData(e.target).get('title')).trim(), created: today(), days: [] });
+    save(); render();
+    document.querySelector('#habitForm input').focus();
+    return;
+  }
   if (e.target.id === 'quick') {
     e.preventDefault();
     const f = new FormData(e.target);
@@ -722,8 +846,15 @@ document.addEventListener('change', e => {
 
 applyTheme();
 renderThemes();
+document.getElementById('ver').textContent = `· Версия ${VERSION}`;
 render();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  // When a newer version takes over, reload once so the old code never keeps running.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+  });
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline mode is optional */ });
 }

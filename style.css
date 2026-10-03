@@ -215,3 +215,22 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 @supports (color: color-mix(in srgb, red, blue)) {
   :root[data-theme] { --accent-soft: color-mix(in srgb, var(--accent) 17%, transparent); }
 }
+
+.icon.star { font-size: 1.15rem; color: var(--muted); }
+.icon.star.on { color: #f5b301; }
+.today-card { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.today-card .big { font-size: 1.5rem; font-weight: 700; }
+.today-card .grow p { margin: 0; }
+.fire { font-weight: 700; color: #e8710a; }
+.hint { font-size: .85rem; color: var(--muted); margin: 0; }
+.dots { display: flex; gap: 3px; align-items: center; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.dots i.on { background: var(--ok); }
+.rates { display: flex; gap: 6px; margin-bottom: 12px; }
+.rate { flex: 1; margin: 0; }
+.rate input { display: none; }
+.rate span { display: flex; flex-direction: column; align-items: center; padding: 8px 0; border: 1px solid var(--line); border-radius: 10px; font-size: 1.5rem; cursor: pointer; }
+.rate small { font-size: .7rem; color: var(--muted); }
+.rate input:checked + span { background: var(--accent-soft); border-color: var(--accent); }
+.note { border-left: 3px solid var(--accent); padding: 4px 10px; margin: 8px 0; font-size: .9rem; }
+.note b { display: block; font-size: .78rem; color: var(--muted); font-weight: 600; }

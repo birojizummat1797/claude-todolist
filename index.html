@@ -20,6 +20,7 @@
   <div class="themes" id="themes" hidden></div>
   <nav class="tabs" role="tablist" aria-label="Бўлимлар">
     <button role="tab" data-tab="tasks">Вазифалар</button>
+    <button role="tab" data-tab="habits">Одатлар</button>
     <button role="tab" data-tab="calendar">Календарь</button>
     <button role="tab" data-tab="roadmap">Режа</button>
     <button role="tab" data-tab="report">Ҳисобот</button>
@@ -29,7 +30,7 @@
 <main id="view" tabindex="-1"></main>
 
 <footer class="foot">
-  <span>Маълумот фақат шу қурилмада сақланади.</span>
+  <span>Маълумот фақат шу қурилмада сақланади. <span id="ver"></span></span>
   <button class="link" data-act="export">Нусха олиш</button>
   <label class="link">Тиклаш<input id="import" type="file" accept="application/json" hidden></label>
 </footer>
@@ -67,6 +68,28 @@
       <button type="button" class="danger" id="taskDel">Ўчириш</button>
       <span class="grow"></span>
       <button type="button" id="taskCancel">Бекор қилиш</button>
+      <button type="submit" class="primary">Сақлаш</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="revDlg">
+  <form id="revForm" method="dialog">
+    <h2>Кун якуни</h2>
+    <p class="muted small">Бугунни ўзинг баҳола. Ҳалол бўл: бу фақат ўзинг учун.</p>
+    <div class="rates" role="radiogroup" aria-label="Кун баҳоси">
+      <label class="rate"><input type="radio" name="rating" value="1" required><span>😞<small>1</small></span></label>
+      <label class="rate"><input type="radio" name="rating" value="2"><span>😕<small>2</small></span></label>
+      <label class="rate"><input type="radio" name="rating" value="3"><span>😐<small>3</small></span></label>
+      <label class="rate"><input type="radio" name="rating" value="4"><span>🙂<small>4</small></span></label>
+      <label class="rate"><input type="radio" name="rating" value="5"><span>😄<small>5</small></span></label>
+    </div>
+    <label>Нима яхши бўлди? Нима қийин бўлди? Эртага нимани яхшилайман?
+      <textarea name="note" rows="4" maxlength="1000"></textarea>
+    </label>
+    <div class="actions">
+      <span class="grow"></span>
+      <button type="button" id="revCancel">Бекор қилиш</button>
       <button type="submit" class="primary">Сақлаш</button>
     </div>
   </form>
