@@ -626,15 +626,7 @@ document.addEventListener('click', e => {
       t.done = el.checked;
       t.doneAt = t.done ? today() : null;
       save();
-      // Restyle the row in place so the strike-through and colour change animate;
-      // the lists are rebuilt a moment later so counters and groups stay correct.
-      const row = el.closest('.task');
-      if (row) row.className = `task ${taskState(t)}`;
-      const leaves = UI.tab === 'tasks' && row && !matchesFilter(t);
-      if (leaves) {
-        setTimeout(() => { if (!matchesFilter(byId(id)) && row.isConnected) row.classList.add('leaving'); }, 800);
-        setTimeout(refresh, 1100);
-      } else setTimeout(refresh, 500);
+      refresh();
       return;
     }
     case 'edit': return openTask(id);

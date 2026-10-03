@@ -100,8 +100,6 @@ button.ghost { color: var(--accent); }
 .task input[type=checkbox]:checked { background: var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center / 80% no-repeat; border-color: var(--ok); transform: scale(1.08); }
 .task .body { flex: 1; min-width: 0; }
 .task .t { word-break: break-word; }
-.task .t span { background: linear-gradient(currentColor, currentColor) no-repeat 0 58% / 0% 2px; transition: background-size .4s ease, color .3s; }
-.task.st-done .t span { background-size: 100% 2px; color: var(--muted); }
 .badge.fin { background: var(--ok); color: #fff; border-color: transparent; }
 .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 3px; font-size: .78rem; color: var(--muted); }
 .badge { padding: 1px 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
@@ -208,8 +206,6 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .swl { font-size: .7rem; color: var(--muted); text-align: center; display: block; margin-top: 2px; }
 .swc { display: flex; flex-direction: column; align-items: center; }
 
-.task { transition: opacity .3s, transform .3s, background .3s, border-color .3s; }
-.task.leaving { opacity: 0; transform: translateX(28px); }
 
 .seg button[aria-pressed="true"] { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
 .day.today { box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft); }
