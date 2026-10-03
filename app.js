@@ -3,7 +3,7 @@
 /* ---------- constants ---------- */
 // Category and priority values are stored in Uzbek Cyrillic and translated only for display.
 const KEY = 'todolist.v1';
-const VERSION = '8';
+const VERSION = '9';
 const CATS = ['Шахсий', 'Иш', 'Ўқиш', 'Соғлиқ', 'Молия', 'Бошқа'];
 const PRIO = { 1: 'Паст', 2: 'Ўрта', 3: 'Юқори' };
 
@@ -57,7 +57,7 @@ const TEMPLATES = {
     ]
   }
 };
-const templateText = k => TEMPLATES[k].steps.map(([n, h]) => `${tr(n)} | ${h}`).join('\n');
+const templateText = k => TEMPLATES[k].steps.map(([n, h]) => `${tr(n)} | ${fmtHM(h)}`).join('\n');
 
 /* ---------- date helpers (local time, YYYY-MM-DD) ---------- */
 const pad = n => String(n).padStart(2, '0');
@@ -90,6 +90,43 @@ function timeRange(t) {
   if (!t.time) return '';
   const e = Number(t.est) || 0;
   return e ? `${t.time}–${fmtMin(toMin(t.time) + Math.round(e * 60))}` : t.time;
+}
+/* duration helpers: tasks store hours (a float); the UI works in hours:minutes */
+function fmtDur(h) {
+  const m = Math.round((Number(h) || 0) * 60);
+  const hh = Math.floor(m / 60);
+  const mm = m % 60;
+  const parts = [];
+  if (hh) parts.push(`${hh} ${tr('соат')}`);
+  if (mm || !hh) parts.push(`${mm} ${tr('дақ')}`);
+  return parts.join(' ');
+}
+const fmtHM = h => { const m = Math.round(h * 60); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
+const DUR_PRESETS = [15, 30, 45, 60, 90, 120];
+function durHtml() {
+  return `<div class="dur-box"><span class="dur-title">⏱ ${esc(tr('Давомийлиги'))}</span>
+    <div class="dur">
+      <input type="number" name="estH" min="0" max="23" inputmode="numeric" placeholder="0" aria-label="${esc(tr('соат'))}"><span>${esc(tr('соат'))}</span>
+      <input type="number" name="estM" min="0" max="59" inputmode="numeric" placeholder="0" aria-label="${esc(tr('дақ'))}"><span>${esc(tr('дақ'))}</span>
+    </div>
+    <div class="dur-chips">${DUR_PRESETS.map(m => `<button type="button" data-act="dur" data-m="${m}">${fmtHM(m / 60)}</button>`).join('')}</div>
+    <small class="endhint"></small></div>`;
+}
+function readDur(f) {
+  const total = (Number(f.estH.value) || 0) * 60 + (Number(f.estM.value) || 0);
+  return total > 0 ? Math.round(total) / 60 : '';
+}
+function setDur(f, est) {
+  const m = Math.round((Number(est) || 0) * 60);
+  f.estH.value = m ? Math.floor(m / 60) || '' : '';
+  f.estM.value = m ? m % 60 || '' : '';
+  updateEndHint(f);
+}
+function updateEndHint(f) {
+  const box = f.querySelector('.endhint');
+  if (!box) return;
+  const est = readDur(f);
+  box.textContent = f.time && f.time.value && est ? tr('Тугаш вақти: {t}', { t: fmtMin(toMin(f.time.value) + Math.round(est * 60)) }) : '';
 }
 // Open timed tasks of one day that overlap each other.
 function overlaps(list) {
@@ -164,17 +201,89 @@ function applyStatic() {
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
   document.getElementById('ver').textContent = `· ${tr('Версия')} ${VERSION}`;
+  document.getElementById('greetMenu').innerHTML = GREETS.map(x => `<button class="chip" data-act="preview-greet" data-id="${x.id}">${x.flag} ${esc(x.name)}</button>`).join('');
 }
-/* ---------- welcome splash ---------- */
-function runSplash() {
-  const el = document.getElementById('splash');
-  if (!el) return;
-  const h = new Date().getHours();
-  document.getElementById('spHello').textContent =
-    h >= 5 && h < 11 ? tr('Хайрли тонг!') : h >= 11 && h < 17 ? tr('Хайрли кун!') : h >= 17 && h < 22 ? tr('Хайрли кеч!') : tr('Хайрли тун!');
-  document.getElementById('spTitle').innerHTML = [...tr('Режаларим')].map((c, i) => `<span style="--i:${i}">${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
-  document.body.classList.add('splashing');
+/* ---------- welcome greetings ---------- */
+// Seven greetings, each in its own language with its own animation.
+// Every launch shows the next one in a shuffled round of seven; a new round never puts a greeting
+// in the same position as the previous round and never repeats the one shown last.
+const GREETS = [
+  { id: 1, dir: 'ltr', lang: 'uz', flag: '🇺🇿', name: 'Ўзбекча', hello: 'Бугун қалайсиз, дўстим?', sub: 'Сизни кўрганимиздан хурсандмиз!', skip: 'Ўтказиш учун босинг' },
+  { id: 2, dir: 'ltr', lang: 'ru', flag: '🇷🇺', name: 'Русский', hello: 'Здравствуйте, уважаемый друг!', sub: 'Мы искренне рады вашему возвращению.', skip: 'Нажмите, чтобы пропустить' },
+  { id: 3, dir: 'ltr', lang: 'en', flag: '🇬🇧', name: 'English', hello: 'Welcome back, champion!', sub: 'Your next quest starts now. Ready?', skip: 'PRESS ANY KEY' },
+  { id: 4, dir: 'ltr', lang: 'fr', flag: '🇫🇷', name: 'Français', hello: 'Bonjour, cher ami !', sub: 'Quel plaisir de vous revoir.', skip: 'Touchez pour passer' },
+  { id: 5, dir: 'rtl', lang: 'ar', flag: '🇸🇦', name: 'العربية', hello: 'السلام عليكم يا صديقي', sub: 'يسعدنا عودتك، نتمنى لك يوماً مباركاً', skip: 'اضغط للتخطي' },
+  { id: 6, dir: 'ltr', lang: 'zh', flag: '🇨🇳', name: '中文', hello: '你好，朋友！', sub: '欢迎回来，今天也一起加油！', skip: '点击跳过' },
+  { id: 7, dir: 'ltr', lang: 'tr', flag: '🇹🇷', name: 'Türkçe', hello: 'Merhaba dostum!', sub: 'Seni tekrar görmek ne güzel.', skip: 'Geçmek için dokun' }
+];
+const GKEY = 'todolist.greet.v1';
+const shuffle = a => { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
+function newOrder(prev) {
+  for (let n = 0; n < 500; n++) {
+    const a = shuffle([1, 2, 3, 4, 5, 6, 7]);
+    if (a.every((v, i) => v !== prev[i]) && a[0] !== prev[6]) return a;
+  }
+  return shuffle([1, 2, 3, 4, 5, 6, 7]);
+}
+function nextGreetId() {
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem(GKEY)); } catch (e) { /* ignore */ }
+  if (!g || !Array.isArray(g.cur) || g.cur.length !== 7) g = { cur: [1, 2, 3, 4, 5, 6, 7], prev: null, pos: 0 };
+  const id = g.cur[g.pos];
+  g.pos++;
+  if (g.pos >= 7) { g.prev = g.cur; g.cur = newOrder(g.prev); g.pos = 0; }
+  try { localStorage.setItem(GKEY, JSON.stringify(g)); } catch (e) { /* ignore */ }
+  return id;
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+// Words are kept together (nowrap) so a long greeting never breaks in the middle of a word.
+function splitChars(text, byWord) {
+  if (byWord) return text.split(' ').map((w, i) => `<span style="--i:${i}">${esc(w)}</span>`).join(' ');
+  let i = 0;
+  return text.split(' ').map(w => `<b class="w">${Array.from(w).map(ch => `<span style="--i:${i++}">${esc(ch)}</span>`).join('')}</b>`).join(' ');
+}
+function greetDecor(id) {
+  switch (id) {
+    case 1: return '<div class="sun"></div><div class="rays"></div><svg class="hills" viewBox="0 0 400 120" preserveAspectRatio="none"><path d="M0 120V72Q70 28 140 62T270 50T400 68V120Z"/></svg>';
+    case 2: return Array.from({ length: 70 }, () => `<i class="star" style="left:${rnd(0, 100).toFixed(1)}%;top:${rnd(0, 100).toFixed(1)}%;--s:${rnd(1, 3).toFixed(1)}px;--d:${rnd(0, 4).toFixed(1)}s"></i>`).join('') + '<b class="shoot"></b><b class="shoot s2"></b>';
+    case 3: return '<div class="floor"></div><div class="sun3"></div><div class="scan"></div>';
+    case 4: return '<div class="curtain l"></div><div class="curtain r"></div><div class="gold-line top"></div><div class="gold-line bot"></div>';
+    case 5: return '<svg class="star8" viewBox="0 0 200 200"><g fill="none" stroke="currentColor" stroke-width="1.4"><rect x="42" y="42" width="116" height="116"/><rect x="42" y="42" width="116" height="116" transform="rotate(45 100 100)"/><circle cx="100" cy="100" r="64"/><circle cx="100" cy="100" r="34"/><circle cx="100" cy="100" r="8"/></g></svg><svg class="star8 s2" viewBox="0 0 200 200"><g fill="none" stroke="currentColor" stroke-width="1.4"><rect x="42" y="42" width="116" height="116"/><rect x="42" y="42" width="116" height="116" transform="rotate(45 100 100)"/></g></svg>';
+    case 6: return Array.from({ length: 7 }, (_, i) => `<div class="lantern" style="left:${(6 + i * 14.5 + rnd(-3, 3)).toFixed(1)}%;--d:${(i * 0.55).toFixed(2)}s;--sz:${Math.round(rnd(34, 58))}px"></div>`).join('');
+    default: return '<svg class="wave w1" viewBox="0 0 800 100" preserveAspectRatio="none"><path d="M0 50Q100 0 200 50T400 50T600 50T800 50V100H0Z"/></svg><svg class="wave w2" viewBox="0 0 800 100" preserveAspectRatio="none"><path d="M0 50Q100 100 200 50T400 50T600 50T800 50V100H0Z"/></svg><svg class="wave w3" viewBox="0 0 800 100" preserveAspectRatio="none"><path d="M0 40Q100 0 200 40T400 40T600 40T800 40V100H0Z"/></svg>'
+      + Array.from({ length: 16 }, () => `<i class="bubble" style="left:${rnd(2, 98).toFixed(1)}%;--sz:${Math.round(rnd(6, 20))}px;--d:${rnd(0, 5).toFixed(1)}s;--t:${rnd(5, 9).toFixed(1)}s"></i>`).join('');
+  }
+}
+function runSplash(forceId, preview = false) {
+  const old = document.getElementById('splash');
+  if (old) old.remove();
+  const q = Number((location.search.match(/[?&]greet=(\d)/) || [])[1]);
+  const id = forceId || (q >= 1 && q <= 7 ? q : nextGreetId());
+  const g = GREETS[id - 1];
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const el = document.createElement('div');
+  el.id = 'splash';
+  el.className = `sp-v${id}`;
+  el.dir = g.dir;
+  el.lang = g.lang;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="sp-deco">${greetDecor(id)}</div>
+    <div class="sp-center">
+      <div class="sp-logo-wrap"><i class="sp-ring"></i><i class="sp-ring r2"></i>
+        <svg class="sp-logo" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="48" r="46"/><path d="M28 50l14 14 26-30"/></svg></div>
+      <p class="sp-hello">${id === 2 ? '' : splitChars(g.hello, id === 5)}</p>
+      <p class="sp-sub">${esc(g.sub)}</p>
+      <div class="sp-bar"><i></i></div>
+      <p class="sp-skip">${esc(g.skip)}</p>
+      <p class="sp-brand">✔ ${esc(tr('Режаларим'))}</p>
+    </div>`;
+  document.body.appendChild(el);
+  document.body.classList.add('splashing');
+  if (id === 2) { // typewriter
+    const target = el.querySelector('.sp-hello');
+    if (reduce) target.textContent = g.hello;
+    else { let n = 0; setTimeout(function type() { n++; target.textContent = g.hello.slice(0, n); if (n < g.hello.length) setTimeout(type, 55); }, 900); }
+  }
   let gone = false;
   const done = () => {
     if (gone) return;
@@ -183,8 +292,9 @@ function runSplash() {
     document.body.classList.remove('splashing');
     setTimeout(() => el.remove(), 600);
   };
-  setTimeout(done, reduce ? 900 : 3600);
-  ['click', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, done, { once: true }));
+  setTimeout(done, reduce ? 1200 : 5000);
+  // ignore the tap that opened a preview, then close on any tap or key
+  setTimeout(() => ['click', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, done, { once: true })), preview ? 400 : 0);
 }
 
 function applyLang() {
@@ -246,7 +356,7 @@ function taskHtml(t) {
         ${t.time ? `<span class="badge time">🕐 ${timeRange(t)}</span>` : ''}
         <span class="badge p${t.priority}">${esc(tr(PRIO[t.priority]))}</span>
         <span class="badge">${esc(tr(t.cat))}</span>
-        ${estOf(t) ? `<span class="badge">${hrs(estOf(t))} ${esc(tr('соат'))}</span>` : ''}
+        ${estOf(t) ? `<span class="badge">${esc(fmtDur(estOf(t)))}</span>` : ''}
         ${t.goalId ? `<span class="badge">🎯 ${esc(tr('мақсад'))}</span>` : ''}
         ${t.moved ? `<span class="badge late">↻ ${esc(tr('{n} марта сурилган', { n: t.moved }))}</span>` : ''}
       </div>
@@ -331,8 +441,7 @@ function renderTasks() {
         <input type="date" name="date" value="${today()}"></label>
       <label><span>🕐 ${esc(tr('Бошланиш вақти'))}</span>
         <input type="time" name="time"></label>
-      <label><span>⏱ ${esc(tr('Давомийлиги (соат)'))}</span>
-        <input type="number" name="est" min="0" max="24" step="0.25" inputmode="decimal" placeholder="${esc(tr('масалан, 1.5'))}"></label>
+      ${durHtml()}
       <button class="primary" type="submit">${esc(tr('Қўшиш'))}</button>
     </form>
     <div class="chips" role="group" aria-label="${esc(tr('Фильтр'))}">
@@ -453,7 +562,7 @@ function renderCalendar() {
       </section>
       <section class="card">
         <h2>${esc(fmtLong(UI.sel))}</h2>
-        <p class="small muted">${esc(tr('Режалаштирилган: {a} / {b} соат', { a: hrs(selLoad), b: hrs(S.capacity) }))}</p>
+        <p class="small muted">${esc(tr('Режалаштирилган: {a} / {b}', { a: fmtDur(selLoad), b: fmtDur(S.capacity) }))}</p>
         ${selLoad > S.capacity ? `<div class="banner warn">${esc(tr('Бу кунга ҳаддан ташқари кўп иш режалаштирилган.'))}</div>` : ''}
         ${clash.length ? `<div class="banner warn">🕐 ${esc(tr('Вақтлар устма-уст тушмоқда: «{a}» ва «{b}».', { a: clash[0][0].title, b: clash[0][1].title }))}</div>` : ''}
         ${dayTasks.length ? `<ul class="list">${dayTasks.map(taskHtml).join('')}</ul>` : `<p class="empty">${esc(tr('Бу кунга вазифа йўқ.'))}</p>`}
@@ -635,7 +744,9 @@ function renderReport() {
 function parseSteps(text) {
   return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
     const [name, h] = l.split('|').map(x => x.trim());
-    const hours = Math.max(0.25, Math.min(100, parseFloat((h || '1').replace(',', '.')) || 1));
+    const raw = (h || '1').trim().replace(',', '.');
+    const hm = raw.match(/^(\d+):(\d{1,2})$/); // "1:20" means 1 hour 20 minutes
+    const hours = Math.max(0.25, Math.min(100, hm ? Number(hm[1]) + Number(hm[2]) / 60 : parseFloat(raw) || 1));
     return { title: name.slice(0, 200), hours };
   });
 }
@@ -707,8 +818,8 @@ function renderRoadmap() {
         <label>${esc(tr('Шаблон'))}
           <select name="tpl">${Object.entries(TEMPLATES).map(([k, v]) => `<option value="${k}" ${r.tpl === k ? 'selected' : ''}>${esc(tr(v.name))}</option>`).join('')}</select>
         </label>
-        <label>${esc(tr('Қадамлар (ҳар қатор: «номи | соат»)'))}
-          <textarea name="steps" rows="9" placeholder="${esc(tr('Мисол:'))}&#10;${esc(tr('Грамматика асослари'))} | 6&#10;${esc(tr('Луғат: 500 та сўз'))} | 8">${esc(r.steps)}</textarea>
+        <label>${esc(tr('Қадамлар (ҳар қатор: «номи | соат ёки 1:20»)'))}
+          <textarea name="steps" rows="9" placeholder="${esc(tr('Мисол:'))}&#10;${esc(tr('Грамматика асослари'))} | 6:00&#10;${esc(tr('Луғат: 500 та сўз'))} | 8:30">${esc(r.steps)}</textarea>
         </label>
         <div class="actions"><button type="submit" class="primary">${esc(tr('Режа тузиш'))}</button></div>
       </form>
@@ -749,13 +860,13 @@ function renderPreview() {
   const p = UI.plan;
   if (!p) { box.innerHTML = ''; return; }
   const warn = !p.fits
-    ? `<div class="banner bad">${esc(tr('Бу муддатга сиғмайди: {o} соат ортиқча. Кунига тахминан {n} соат керак, ёки муддатни узайтиринг, ёки қадамларни қисқартиринг.', { o: hrs(p.overflow), n: hrs(p.need) }))}</div>`
-    : `<div class="banner ok">${esc(tr('Режа сиғади. Жами {t} соат, {d} иш куни', { t: hrs(p.total), d: p.workDays }))}${p.bufferDays ? esc(tr(', шундан охирги {b} таси захира', { b: p.bufferDays })) : ''}.</div>`;
+    ? `<div class="banner bad">${esc(tr('Бу муддатга сиғмайди: {o} ортиқча. Кунига тахминан {n} керак, ёки муддатни узайтиринг, ёки қадамларни қисқартиринг.', { o: fmtDur(p.overflow), n: fmtDur(p.need) }))}</div>`
+    : `<div class="banner ok">${esc(tr('Режа сиғади. Жами {t}, {d} иш куни', { t: fmtDur(p.total), d: p.workDays }))}${p.bufferDays ? esc(tr(', шундан охирги {b} таси захира', { b: p.bufferDays })) : ''}.</div>`;
   box.innerHTML = `<section class="card">
     <h2>${esc(tr('Йўл харитаси'))}: ${esc(p.goal.title)}</h2>
     ${warn}
     <ol class="timeline">${p.items.map(i => `<li class="${i.over ? 'over' : i.review ? 'rev' : ''}">
-      <div class="d">${esc(fmtLong(i.date))} · ${hrs(i.hours)} ${esc(tr('соат'))}${i.over ? ' · ' + esc(tr('сиғмаган')) : ''}</div>${esc(i.title)}</li>`).join('')}</ol>
+      <div class="d">${esc(fmtLong(i.date))} · ${esc(fmtDur(i.hours))}${i.over ? ' · ' + esc(tr('сиғмаган')) : ''}</div>${esc(i.title)}</li>`).join('')}</ol>
     <div class="actions"><button class="primary" data-act="apply-plan">${esc(tr('Календарга қўшиш'))}</button></div>
   </section>`;
 }
@@ -801,6 +912,9 @@ const dlg = document.getElementById('taskDlg');
 const form = document.getElementById('taskForm');
 let editingId = null;
 function buildDialogOptions() {
+  const est = form.estH ? readDur(form) : '';
+  form.querySelector('.dur-slot').innerHTML = durHtml();
+  setDur(form, est);
   const cat = form.cat.value;
   const pr = form.priority.value || '2';
   form.cat.innerHTML = CATS.map(c => `<option value="${c}">${esc(tr(c))}</option>`).join('');
@@ -815,7 +929,7 @@ function openTask(id, defaults = {}) {
   document.getElementById('taskDlgTitle').textContent = id ? tr('Вазифани таҳрирлаш') : tr('Янги вазифа');
   form.title.value = t.title; form.notes.value = t.notes || ''; form.date.value = t.date || '';
   form.time.value = t.time || '';
-  form.est.value = t.est || ''; form.priority.value = t.priority; form.cat.value = t.cat;
+  setDur(form, t.est); form.priority.value = t.priority; form.cat.value = t.cat;
   document.getElementById('taskDel').hidden = !id;
   dlg.showModal();
   form.title.focus();
@@ -824,7 +938,7 @@ form.addEventListener('submit', e => {
   e.preventDefault();
   const data = {
     title: form.title.value.trim(), notes: form.notes.value.trim(), date: form.date.value, time: form.time.value,
-    est: form.est.value ? Number(form.est.value) : '', priority: Number(form.priority.value), cat: form.cat.value
+    est: readDur(form), priority: Number(form.priority.value), cat: form.cat.value
   };
   if (!data.title) return;
   if (editingId) {
@@ -896,6 +1010,20 @@ document.addEventListener('click', e => {
       save(); return render();
     }
     case 'review': return openReview();
+    case 'dur': {
+      const f = el.closest('form');
+      const m = Number(el.dataset.m);
+      f.estH.value = Math.floor(m / 60) || '';
+      f.estM.value = m % 60 || '';
+      updateEndHint(f);
+      return;
+    }
+    case 'preview-greet': return runSplash(Number(el.dataset.id), true);
+    case 'greet-menu': {
+      const box = document.getElementById('greetMenu');
+      box.hidden = !box.hidden;
+      return;
+    }
     case 'habit': {
       const h = S.habits.find(x => x.id === id);
       const td = today();
@@ -970,7 +1098,7 @@ document.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     S.tasks.push({
-      id: uid(), title: String(fd.get('title')).trim(), notes: '', date: fd.get('date') || '', time: fd.get('time') || '', est: fd.get('est') ? Number(fd.get('est')) : '',
+      id: uid(), title: String(fd.get('title')).trim(), notes: '', date: fd.get('date') || '', time: fd.get('time') || '', est: readDur(e.target),
       priority: 2, cat: CATS[0], done: false, doneAt: null, created: Date.now()
     });
     save(); render();
@@ -982,6 +1110,8 @@ document.addEventListener('submit', e => {
 });
 
 document.addEventListener('input', e => {
+  const f = e.target.form;
+  if (f && f.querySelector('.endhint') && e.target.matches('input[name=estH], input[name=estM], input[name=time]')) updateEndHint(f);
   if (e.target.id === 'q') {
     UI.q = e.target.value;
     const pos = e.target.selectionStart;
