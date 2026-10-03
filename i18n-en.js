@@ -139,3 +139,8 @@ Object.assign(DICT.en, {
   'Жорий маълумотлар файлдагиси билан алмаштирилсинми?': 'Replace current data with the data from the file?',
   'Маълумот тикланди': 'Data restored', 'Файл нотўғри': 'Invalid file'
 });
+Object.assign(DICT.en, {
+  'Хайрли тонг!': 'Good morning!', 'Хайрли кун!': 'Good afternoon!', 'Хайрли кеч!': 'Good evening!', 'Хайрли тун!': 'Good night!',
+  'Шахсий кундалик ва интизом дастурига хуш келибсиз': 'Welcome to your personal planner and self-discipline app',
+  'Ўтказиб юбориш учун босинг': 'Tap to skip'
+});

@@ -251,3 +251,139 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 .quick { grid-template-columns: 1fr 150px 110px auto; }
 @media (max-width: 760px) { .quick { grid-template-columns: 1fr 1fr; } .quick button { grid-column: 1 / -1; } }
 .top-row { flex-wrap: wrap; }
+
+/* ===== quick-add form: every field has a visible label (also on phones) ===== */
+.quick { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr auto; gap: 8px 10px; align-items: end; }
+.quick label { margin: 0; }
+.quick .q-title { grid-column: 1 / -1; }
+.quick button { align-self: end; padding: 10px 16px; }
+input[type="date"], input[type="time"] { min-height: 42px; text-align: left; -webkit-appearance: none; appearance: none; }
+@media (max-width: 760px) {
+  .quick { grid-template-columns: 1fr 1fr; }
+  .quick button { grid-column: 1 / -1; }
+  /* Mobile browsers draw an empty time/date box with no hint, so add an icon */
+  input[type="time"] { background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93a8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") no-repeat right 10px center / 20px; padding-right: 38px; }
+  input[type="date"] { background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a93a8' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='3'/%3E%3Cpath d='M3 10h18M8 3v4M16 3v4'/%3E%3C/svg%3E") no-repeat right 10px center / 20px; padding-right: 38px; }
+}
+
+/* ===== welcome splash ===== */
+#splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; text-align: center; color: #fff; overflow: hidden;
+  background: radial-gradient(circle at 20% 20%, var(--g1) 0, transparent 52%), radial-gradient(circle at 82% 18%, var(--g2) 0, transparent 50%),
+    radial-gradient(circle at 72% 86%, var(--g3) 0, transparent 52%), radial-gradient(circle at 14% 82%, var(--g4) 0, transparent 50%), var(--g0);
+  background-size: 190% 190%;
+  animation: drift 9s ease-in-out infinite alternate, spFailsafe .01s 7s forwards;
+  transition: opacity .5s ease, transform .5s ease, filter .5s ease; }
+#splash::before { content: ""; position: absolute; inset: 0; background: rgba(8, 12, 36, .42); }
+#splash.out { opacity: 0; transform: scale(1.07); filter: blur(8px); pointer-events: none; }
+@keyframes spFailsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+body.splashing { overflow: hidden; }
+.sp-center { position: relative; padding: 24px; max-width: 520px; }
+.sp-logo-wrap { position: relative; width: 120px; height: 120px; margin: 0 auto 18px; }
+.sp-logo { position: relative; width: 120px; height: 120px; filter: drop-shadow(0 0 20px rgba(255, 255, 255, .6)); }
+.sp-logo circle { fill: rgba(255, 255, 255, .12); stroke: #fff; stroke-width: 3; stroke-dasharray: 289; stroke-dashoffset: 289; animation: spDraw .9s .15s ease forwards; }
+.sp-logo path { fill: none; stroke: #fff; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 70; stroke-dashoffset: 70; animation: spDraw .55s .85s ease forwards; }
+.sp-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .55); opacity: 0; animation: spPulse 2.2s 1.2s ease-out infinite; }
+.sp-ring.r2 { animation-delay: 1.9s; }
+@keyframes spDraw { to { stroke-dashoffset: 0; } }
+@keyframes spPulse { 0% { transform: scale(.9); opacity: .8; } 100% { transform: scale(1.9); opacity: 0; } }
+.sp-title { margin: 0 0 10px; font-size: clamp(2rem, 8vw, 3rem); letter-spacing: .02em; text-shadow: 0 0 24px rgba(255, 255, 255, .55); }
+.sp-title span { display: inline-block; opacity: 0; transform: translateY(26px) scale(.7); animation: spLetter .55s calc(1.1s + var(--i) * .06s) cubic-bezier(.2, 1.5, .4, 1) forwards; }
+@keyframes spLetter { to { opacity: 1; transform: none; } }
+.sp-hello { margin: 0 0 6px; font-size: 1.35rem; font-weight: 600; opacity: 0; animation: spUp .6s 1.7s ease forwards; }
+.sp-sub { margin: 0 auto 22px; max-width: 360px; font-size: 1rem; opacity: 0; animation: spUp .6s 2s ease forwards; }
+.sp-bar { width: min(260px, 70vw); height: 6px; margin: 0 auto 14px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.sp-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #fff, rgba(255, 255, 255, .6)); animation: spBar 2.3s 1.1s cubic-bezier(.3, .6, .3, 1) forwards; }
+.sp-skip { margin: 0; font-size: .8rem; opacity: 0; animation: spUp .6s 2.4s ease forwards; }
+@keyframes spBar { to { width: 100%; } }
+@keyframes spUp { from { opacity: 0; transform: translateY(12px); } to { opacity: .95; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  #splash, .sp-logo circle, .sp-logo path, .sp-title span, .sp-hello, .sp-sub, .sp-bar i, .sp-skip { animation: none !important; }
+  .sp-logo circle, .sp-logo path { stroke-dashoffset: 0; }
+  .sp-title span, .sp-hello, .sp-sub, .sp-skip { opacity: 1; transform: none; }
+  .sp-bar i { width: 100%; } .sp-ring { display: none; }
+}
+
+/* ===== each theme has its own shape language ===== */
+/* Aurora: frosted glass with glow */
+:root[data-theme="aurora"] .card, :root[data-theme="aurora"] .foot, :root[data-theme="aurora"] dialog { border-radius: 26px; border: 1px solid rgba(255, 255, 255, .2); box-shadow: 0 10px 40px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .18); }
+:root[data-theme="aurora"] .top { border-radius: 0 0 26px 26px; border-color: rgba(255, 255, 255, .18); }
+:root[data-theme="aurora"] input, :root[data-theme="aurora"] select, :root[data-theme="aurora"] textarea { border-radius: 14px; }
+:root[data-theme="aurora"] button.primary, :root[data-theme="aurora"] .chip, :root[data-theme="aurora"] .seg, :root[data-theme="aurora"] .actions button, :root[data-theme="aurora"] .ghost, :root[data-theme="aurora"] .theme-btn { border-radius: 99px; }
+:root[data-theme="aurora"] button.primary { box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 55%, transparent); }
+:root[data-theme="aurora"] .task { border-radius: 20px; border-left-width: 1px; border-color: color-mix(in srgb, var(--stc) 55%, transparent); box-shadow: 0 0 18px color-mix(in srgb, var(--stc) 24%, transparent); }
+:root[data-theme="aurora"] .task input[type=checkbox] { box-shadow: 0 0 12px color-mix(in srgb, var(--stc) 70%, transparent); }
+:root[data-theme="aurora"] .badge { border-radius: 99px; } :root[data-theme="aurora"] .day { border-radius: 14px; } :root[data-theme="aurora"] .kpi { border-radius: 18px; }
+
+/* Night: sharp terminal / tech */
+:root[data-theme="night"] body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+:root[data-theme="night"] .card, :root[data-theme="night"] .foot, :root[data-theme="night"] dialog { border-radius: 3px; border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 14%, transparent); }
+:root[data-theme="night"] .top { border-radius: 0; border-bottom: 1px solid var(--accent); }
+:root[data-theme="night"] h2 { text-transform: uppercase; letter-spacing: .09em; font-size: .88rem; }
+:root[data-theme="night"] input, :root[data-theme="night"] select, :root[data-theme="night"] textarea, :root[data-theme="night"] button.primary, :root[data-theme="night"] .chip, :root[data-theme="night"] .seg, :root[data-theme="night"] .actions button, :root[data-theme="night"] .ghost, :root[data-theme="night"] .theme-btn, :root[data-theme="night"] .lang-sel { border-radius: 2px; }
+:root[data-theme="night"] button.primary { text-transform: uppercase; letter-spacing: .08em; }
+:root[data-theme="night"] .tabs button { text-transform: uppercase; letter-spacing: .07em; font-size: .78rem; }
+:root[data-theme="night"] .task { border-radius: 2px; border-left-width: 3px; }
+:root[data-theme="night"] .task input[type=checkbox] { border-radius: 3px; }
+:root[data-theme="night"] .badge, :root[data-theme="night"] .day, :root[data-theme="night"] .kpi, :root[data-theme="night"] .banner, :root[data-theme="night"] .sev { border-radius: 2px; }
+
+/* Ocean: soft bubbles */
+:root[data-theme="ocean"] .card, :root[data-theme="ocean"] .foot, :root[data-theme="ocean"] dialog { border-radius: 32px; border: none; box-shadow: 0 14px 34px rgba(20, 100, 170, .22); }
+:root[data-theme="ocean"] .top { border-radius: 0 0 30px 30px; border: none; box-shadow: 0 8px 24px rgba(20, 100, 170, .2); }
+:root[data-theme="ocean"] input, :root[data-theme="ocean"] select, :root[data-theme="ocean"] textarea { border-radius: 18px; }
+:root[data-theme="ocean"] button.primary, :root[data-theme="ocean"] .chip, :root[data-theme="ocean"] .seg, :root[data-theme="ocean"] .actions button, :root[data-theme="ocean"] .ghost, :root[data-theme="ocean"] .theme-btn, :root[data-theme="ocean"] .badge { border-radius: 99px; }
+:root[data-theme="ocean"] .task { border-radius: 26px; border: 2px solid color-mix(in srgb, var(--stc) 40%, transparent); }
+:root[data-theme="ocean"] .task input[type=checkbox] { width: 26px; height: 26px; }
+:root[data-theme="ocean"] .day { border-radius: 20px; } :root[data-theme="ocean"] .kpi { border-radius: 22px; } :root[data-theme="ocean"] .banner { border-radius: 20px; }
+
+/* Sunset: warm chunky outlines with hard shadows */
+:root[data-theme="sunset"] { --ink: #3a1a2e; }
+:root[data-theme="sunset"] body { font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif; }
+:root[data-theme="sunset"] .card, :root[data-theme="sunset"] .foot, :root[data-theme="sunset"] dialog { border-radius: 14px; border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+:root[data-theme="sunset"] .top { border-radius: 0; border-bottom: 2px solid var(--ink); box-shadow: 0 4px 0 var(--ink); }
+:root[data-theme="sunset"] input, :root[data-theme="sunset"] select, :root[data-theme="sunset"] textarea { border: 2px solid var(--ink); border-radius: 10px; }
+:root[data-theme="sunset"] button.primary, :root[data-theme="sunset"] .actions button, :root[data-theme="sunset"] .ghost, :root[data-theme="sunset"] .chip, :root[data-theme="sunset"] .theme-btn { border: 2px solid var(--ink); border-radius: 10px; font-weight: 700; }
+:root[data-theme="sunset"] button.primary { box-shadow: 3px 3px 0 var(--ink); }
+:root[data-theme="sunset"] button.primary:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+:root[data-theme="sunset"] .seg { border: 2px solid var(--ink); border-radius: 10px; }
+:root[data-theme="sunset"] h1, :root[data-theme="sunset"] h2 { font-weight: 900; }
+:root[data-theme="sunset"] .task { border-radius: 12px; border: 2px solid var(--ink); border-left-width: 10px; border-left-color: var(--stc); box-shadow: 3px 3px 0 var(--ink); }
+:root[data-theme="sunset"] .task input[type=checkbox] { border-radius: 8px; border-width: 3px; }
+:root[data-theme="sunset"] .badge { border-radius: 6px; border: 1.5px solid var(--ink); }
+:root[data-theme="sunset"] .day { border: 2px solid var(--ink); border-radius: 10px; } :root[data-theme="sunset"] .kpi { border: 2px solid var(--ink); border-radius: 10px; }
+
+/* Forest: organic leaf shapes, dashed borders, serif */
+:root[data-theme="forest"] body { font-family: Georgia, "Times New Roman", serif; }
+:root[data-theme="forest"] .card, :root[data-theme="forest"] .foot, :root[data-theme="forest"] dialog { border-radius: 30px 10px 30px 10px; border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: none; }
+:root[data-theme="forest"] .top { border-radius: 0 0 30px 10px; border-bottom: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+:root[data-theme="forest"] input, :root[data-theme="forest"] select, :root[data-theme="forest"] textarea { border-radius: 14px 5px 14px 5px; }
+:root[data-theme="forest"] button.primary, :root[data-theme="forest"] .actions button, :root[data-theme="forest"] .ghost, :root[data-theme="forest"] .chip, :root[data-theme="forest"] .theme-btn { border-radius: 16px 5px 16px 5px; }
+:root[data-theme="forest"] .seg { border-radius: 16px 5px 16px 5px; }
+:root[data-theme="forest"] .task { border-radius: 20px 6px 20px 6px; border: 2px dashed color-mix(in srgb, var(--stc) 55%, transparent); border-left: 6px solid var(--stc); }
+:root[data-theme="forest"] .task input[type=checkbox] { border-radius: 50% 4px 50% 4px; }
+:root[data-theme="forest"] .badge { border-radius: 10px 3px 10px 3px; } :root[data-theme="forest"] .day { border-radius: 14px 4px 14px 4px; } :root[data-theme="forest"] .kpi { border-radius: 18px 5px 18px 5px; }
+
+/* Lavender: dreamy and very soft */
+:root[data-theme="lavender"] body { font-family: ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif; }
+:root[data-theme="lavender"] .card, :root[data-theme="lavender"] .foot, :root[data-theme="lavender"] dialog { border-radius: 36px; border: none; box-shadow: 0 18px 50px rgba(124, 77, 255, .22), inset 0 2px 0 rgba(255, 255, 255, .75); }
+:root[data-theme="lavender"] .top { border-radius: 0 0 36px 36px; border: none; box-shadow: 0 10px 30px rgba(124, 77, 255, .18); }
+:root[data-theme="lavender"] input, :root[data-theme="lavender"] select, :root[data-theme="lavender"] textarea { border: none; border-radius: 22px; background-color: rgba(255, 255, 255, .75); box-shadow: inset 0 2px 6px rgba(124, 77, 255, .14); }
+:root[data-theme="lavender"] button.primary, :root[data-theme="lavender"] .actions button, :root[data-theme="lavender"] .ghost, :root[data-theme="lavender"] .chip, :root[data-theme="lavender"] .seg, :root[data-theme="lavender"] .theme-btn, :root[data-theme="lavender"] .badge { border-radius: 99px; }
+:root[data-theme="lavender"] button.primary { box-shadow: 0 8px 20px rgba(124, 77, 255, .35); }
+:root[data-theme="lavender"] .task { border: none; border-radius: 28px; padding-left: 20px; box-shadow: inset 7px 0 0 var(--stc), 0 8px 22px rgba(124, 77, 255, .12); }
+:root[data-theme="lavender"] .task input[type=checkbox] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--stc) 20%, transparent); }
+:root[data-theme="lavender"] .day { border: none; border-radius: 22px; box-shadow: 0 2px 8px rgba(124, 77, 255, .12); } :root[data-theme="lavender"] .kpi { border-radius: 24px; } :root[data-theme="lavender"] .banner { border-radius: 22px; }
+/* The plain theme has pale colours, so give its splash a vivid gradient instead */
+:root[data-theme="auto"] #splash { background: linear-gradient(135deg, #2f6fed, #7a55ee 45%, #c04fd8 75%, #ff7a9c); background-size: 220% 220%; }
+:root[data-theme="auto"] #splash::before { background: rgba(8, 12, 36, .12); }
+
+/* phone fixes: one icon per date/time box, compact header, duration beside the add button */
+@media (max-width: 760px) {
+  .quick button { grid-column: auto; }
+  input[type="date"], input[type="time"] { position: relative; }
+  input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+}
+@media (max-width: 520px) {
+  .top-row { flex-wrap: nowrap; gap: 6px; }
+  .top-row h1 { min-width: 0; font-size: 1.1rem; }
+  .theme-btn span { display: none; }
+}

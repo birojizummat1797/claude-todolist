@@ -3,7 +3,7 @@
 /* ---------- constants ---------- */
 // Category and priority values are stored in Uzbek Cyrillic and translated only for display.
 const KEY = 'todolist.v1';
-const VERSION = '7';
+const VERSION = '8';
 const CATS = ['Шахсий', 'Иш', 'Ўқиш', 'Соғлиқ', 'Молия', 'Бошқа'];
 const PRIO = { 1: 'Паст', 2: 'Ўрта', 3: 'Юқори' };
 
@@ -165,6 +165,28 @@ function applyStatic() {
   document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', tr(el.dataset.i18nAria)); });
   document.getElementById('ver').textContent = `· ${tr('Версия')} ${VERSION}`;
 }
+/* ---------- welcome splash ---------- */
+function runSplash() {
+  const el = document.getElementById('splash');
+  if (!el) return;
+  const h = new Date().getHours();
+  document.getElementById('spHello').textContent =
+    h >= 5 && h < 11 ? tr('Хайрли тонг!') : h >= 11 && h < 17 ? tr('Хайрли кун!') : h >= 17 && h < 22 ? tr('Хайрли кеч!') : tr('Хайрли тун!');
+  document.getElementById('spTitle').innerHTML = [...tr('Режаларим')].map((c, i) => `<span style="--i:${i}">${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
+  document.body.classList.add('splashing');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let gone = false;
+  const done = () => {
+    if (gone) return;
+    gone = true;
+    el.classList.add('out');
+    document.body.classList.remove('splashing');
+    setTimeout(() => el.remove(), 600);
+  };
+  setTimeout(done, reduce ? 900 : 3600);
+  ['click', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, done, { once: true }));
+}
+
 function applyLang() {
   LANG = LANGS[S.lang] ? S.lang : 'uz-Cyrl';
   document.documentElement.lang = LANG;
@@ -303,9 +325,14 @@ function renderTasks() {
   ${focusHtml()}
   <section class="card">
     <form class="quick" id="quick">
-      <input name="title" placeholder="${esc(tr('Янги вазифа...'))}" required maxlength="200" autocomplete="off" aria-label="${esc(tr('Вазифа номи'))}">
-      <input type="date" name="date" value="${today()}" aria-label="${esc(tr('Муддат'))}">
-      <input type="time" name="time" aria-label="${esc(tr('Бошланиш вақти'))}">
+      <label class="q-title"><span>${esc(tr('Номи'))}</span>
+        <input name="title" placeholder="${esc(tr('Янги вазифа...'))}" required maxlength="200" autocomplete="off"></label>
+      <label><span>📅 ${esc(tr('Муддат'))}</span>
+        <input type="date" name="date" value="${today()}"></label>
+      <label><span>🕐 ${esc(tr('Бошланиш вақти'))}</span>
+        <input type="time" name="time"></label>
+      <label><span>⏱ ${esc(tr('Давомийлиги (соат)'))}</span>
+        <input type="number" name="est" min="0" max="24" step="0.25" inputmode="decimal" placeholder="${esc(tr('масалан, 1.5'))}"></label>
       <button class="primary" type="submit">${esc(tr('Қўшиш'))}</button>
     </form>
     <div class="chips" role="group" aria-label="${esc(tr('Фильтр'))}">
@@ -943,7 +970,7 @@ document.addEventListener('submit', e => {
     e.preventDefault();
     const fd = new FormData(e.target);
     S.tasks.push({
-      id: uid(), title: String(fd.get('title')).trim(), notes: '', date: fd.get('date') || '', time: fd.get('time') || '', est: '',
+      id: uid(), title: String(fd.get('title')).trim(), notes: '', date: fd.get('date') || '', time: fd.get('time') || '', est: fd.get('est') ? Number(fd.get('est')) : '',
       priority: 2, cat: CATS[0], done: false, doneAt: null, created: Date.now()
     });
     save(); render();
@@ -988,6 +1015,7 @@ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().
 applyTheme();
 applyLang();
 render();
+runSplash();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   const hadController = !!navigator.serviceWorker.controller;
