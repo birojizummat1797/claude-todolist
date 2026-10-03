@@ -62,7 +62,16 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 /* ---------- state ---------- */
-const defaultState = () => ({ tasks: [], goals: [], capacity: 6 });
+const defaultState = () => ({ tasks: [], goals: [], capacity: 6, theme: 'auto' });
+const THEMES = [
+  { id: 'auto', name: 'Оддий', mode: '', p: ['#dbe6ff', '#eddfff', '#d9f3e6'] },
+  { id: 'aurora', name: 'Аврора', mode: 'dark', p: ['#19b88f', '#5a57ee', '#b24fd6'] },
+  { id: 'night', name: 'Тун', mode: 'dark', p: ['#1c2a6b', '#3a1d6e', '#0c4a5c'] },
+  { id: 'ocean', name: 'Океан', mode: 'light', p: ['#5db2f0', '#8fe8d8', '#a9c6ff'] },
+  { id: 'sunset', name: 'Шафақ', mode: 'light', p: ['#ff9a6a', '#ff7fae', '#c78cff'] },
+  { id: 'forest', name: 'Ўрмон', mode: 'light', p: ['#7fd49a', '#5fc4a8', '#dcee8f'] },
+  { id: 'lavender', name: 'Лаванда', mode: 'light', p: ['#c4a8ff', '#ffb8e0', '#b0c8ff'] }
+];
 let S = load();
 const UI = {
   tab: 'tasks',
@@ -84,6 +93,17 @@ function load() {
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Сақлаб бўлмади: браузер рухсат бермаяпти'); }
+}
+function applyTheme() {
+  const t = THEMES.find(x => x.id === S.theme) || THEMES[0];
+  const root = document.documentElement;
+  root.dataset.theme = t.id;
+  if (t.mode) root.dataset.mode = t.mode; else delete root.dataset.mode;
+}
+function renderThemes() {
+  document.getElementById('themes').innerHTML = THEMES.map(t => `<div class="swc">
+    <button class="sw" data-act="theme" data-id="${t.id}" aria-pressed="${t.id === S.theme}" aria-label="${t.name}"
+      style="background:linear-gradient(135deg,${t.p.join(',')})"></button><span class="swl">${t.name}</span></div>`).join('');
 }
 function toast(msg) {
   const t = document.getElementById('toast');
@@ -142,20 +162,21 @@ function render() {
 }
 
 /* Tasks */
-const FILTERS = [['all', 'Ҳаммаси'], ['today', 'Бугун'], ['late', 'Кечиккан'], ['soon', 'Келгуси'], ['done', 'Бажарилган']];
+const FILTERS = [['all', 'Фаол'], ['today', 'Бугун'], ['late', 'Кечиккан'], ['soon', 'Келгуси'], ['done', 'Бажарилган']];
 function filtered() {
-  const td = today();
   const q = UI.q.trim().toLowerCase();
-  return sortTasks(S.tasks.filter(t => {
-    if (q && !(t.title + ' ' + (t.notes || '')).toLowerCase().includes(q)) return false;
-    switch (UI.filter) {
-      case 'today': return !t.done && t.date === td;
-      case 'late': return !t.done && t.date && t.date < td;
-      case 'soon': return !t.done && t.date && t.date > td;
-      case 'done': return t.done;
-      default: return true;
-    }
-  }));
+  return sortTasks(S.tasks.filter(t =>
+    (!q || (t.title + ' ' + (t.notes || '')).toLowerCase().includes(q)) && matchesFilter(t)));
+}
+function matchesFilter(t) {
+  const td = today();
+  switch (UI.filter) {
+    case 'today': return !t.done && t.date === td;
+    case 'late': return !t.done && t.date && t.date < td;
+    case 'soon': return !t.done && t.date && t.date > td;
+    case 'done': return t.done;
+    default: return !t.done;
+  }
 }
 function renderTasks() {
   const list = filtered();
@@ -169,11 +190,11 @@ function renderTasks() {
       <button class="primary" type="submit">Қўшиш</button>
     </form>
     <div class="chips" role="group" aria-label="Фильтр">
-      ${FILTERS.map(([k, n]) => `<button class="chip" data-act="filter" data-k="${k}" aria-pressed="${UI.filter === k}">${n}</button>`).join('')}
+      ${FILTERS.map(([k, n]) => `<button class="chip" data-act="filter" data-k="${k}" aria-pressed="${UI.filter === k}">${n}${k === 'done' && S.tasks.some(t => t.done) ? ` (${S.tasks.filter(t => t.done).length})` : ''}</button>`).join('')}
     </div>
     <input class="search" type="search" id="q" placeholder="Қидириш..." value="${esc(UI.q)}" aria-label="Қидириш">
     <p class="muted small">Очиқ: ${open} · Кечиккан: ${late}</p>
-    ${list.length ? `<ul class="list">${list.map(taskHtml).join('')}</ul>` : '<p class="empty">Бу ерда ҳозирча вазифа йўқ.</p>'}
+    ${list.length ? `<ul class="list">${list.map(taskHtml).join('')}</ul>` : `<p class="empty">${UI.filter === 'done' ? 'Ҳали бажарилган вазифа йўқ.' : 'Фаол вазифа йўқ. Янгисини қўшинг!'}</p>`}
     ${S.tasks.some(t => t.done) ? '<button class="link small" data-act="clear-done">Бажарилганларни тозалаш</button>' : ''}
   </section>`;
 }
@@ -561,6 +582,11 @@ document.getElementById('taskDel').onclick = () => {
 };
 
 /* ---------- events ---------- */
+document.getElementById('themeBtn').addEventListener('click', e => {
+  const box = document.getElementById('themes');
+  box.hidden = !box.hidden;
+  e.currentTarget.setAttribute('aria-expanded', String(!box.hidden));
+});
 document.querySelector('.tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]');
   if (b) { UI.tab = b.dataset.tab; render(); }
@@ -575,10 +601,18 @@ document.addEventListener('click', e => {
       const t = byId(id);
       t.done = el.checked;
       t.doneAt = t.done ? today() : null;
-      save(); render();
+      save();
+      const row = el.closest('.task');
+      // In the task list a finished (or restored) task slides out; other views just refresh.
+      if (UI.tab === 'tasks' && row && !matchesFilter(t)) {
+        row.classList.add('leaving');
+        setTimeout(render, 280);
+      } else render();
       return;
     }
     case 'edit': return openTask(id);
+    case 'theme':
+      S.theme = id; save(); applyTheme(); renderThemes(); return;
     case 'filter': UI.filter = el.dataset.k; return render();
     case 'clear-done':
       if (confirm('Барча бажарилган вазифалар ўчирилсинми? Ҳисобот ҳам ўзгаради.')) {
@@ -660,6 +694,8 @@ document.addEventListener('change', e => {
   }
 });
 
+applyTheme();
+renderThemes();
 render();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

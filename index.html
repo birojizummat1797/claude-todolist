@@ -13,7 +13,11 @@
 </head>
 <body>
 <header class="top">
-  <h1>✔ Режаларим</h1>
+  <div class="top-row">
+    <h1>✔ Режаларим</h1>
+    <button class="theme-btn" id="themeBtn" aria-expanded="false" aria-controls="themes">🎨 Фон</button>
+  </div>
+  <div class="themes" id="themes" hidden></div>
   <nav class="tabs" role="tablist" aria-label="Бўлимлар">
     <button role="tab" data-tab="tasks">Вазифалар</button>
     <button role="tab" data-tab="calendar">Календарь</button>
